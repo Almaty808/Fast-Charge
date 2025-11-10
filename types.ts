@@ -12,6 +12,13 @@ export interface FreeUser {
   phone?: string;
 }
 
+export interface HistoryEntry {
+  id: string;
+  date: string;
+  employee: string;
+  change: string;
+}
+
 export interface Station {
   id: string;
   locationName: string;
@@ -23,5 +30,7 @@ export interface Station {
   coordinates: { lat: number; lng: number } | null;
   sid?: string;
   did?: string;
+  sim?: string;
   freeUsers?: FreeUser[];
+  history: HistoryEntry[];
 }

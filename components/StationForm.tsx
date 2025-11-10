@@ -10,7 +10,7 @@ interface StationFormProps {
   onClose: () => void;
 }
 
-type FormData = Omit<Station, 'id'>;
+type FormData = Omit<Station, 'id' | 'history'>;
 
 const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onSave, onClose }) => {
   const [formData, setFormData] = useState<FormData>({
@@ -23,6 +23,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
     coordinates: null,
     sid: '',
     did: '',
+    sim: '',
     freeUsers: [],
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,6 +34,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
           ...station,
           sid: station.sid || '',
           did: station.did || '',
+          sim: station.sim || '',
           freeUsers: station.freeUsers || [],
       });
     } else {
@@ -47,6 +49,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
             coordinates: null,
             sid: '',
             did: '',
+            sim: '',
             freeUsers: [],
         });
     }
@@ -127,10 +130,11 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const dataToSave: Omit<Station, 'id'> = {
+    const dataToSave: Omit<Station, 'id' | 'history'> = {
         ...formData,
         sid: formData.sid || undefined,
         did: formData.did || undefined,
+        sim: formData.sim || undefined,
         freeUsers: formData.freeUsers?.filter(u => u.fullName.trim() !== ''),
     };
     
@@ -141,6 +145,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
     onSave({
       id: station ? station.id : new Date().toISOString(),
       ...dataToSave,
+      history: station?.history || [],
     });
   };
 
@@ -192,7 +197,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
 
            <fieldset className="p-4 border border-slate-300 dark:border-slate-600 rounded-md">
             <legend className="text-sm font-medium text-slate-700 dark:text-slate-300 px-2">Дополнительные параметры</legend>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
                 <div>
                     <label htmlFor="sid" className="block text-xs font-medium text-slate-600 dark:text-slate-400">SID</label>
                     <input type="text" name="sid" id="sid" value={formData.sid || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200" />
@@ -200,6 +205,10 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
                 <div>
                     <label htmlFor="did" className="block text-xs font-medium text-slate-600 dark:text-slate-400">DID</label>
                     <input type="text" name="did" id="did" value={formData.did || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200" />
+                </div>
+                 <div>
+                    <label htmlFor="sim" className="block text-xs font-medium text-slate-600 dark:text-slate-400">SIM</label>
+                    <input type="text" name="sim" id="sim" value={formData.sim || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200" />
                 </div>
             </div>
           </fieldset>
@@ -267,7 +276,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
           <div>
             <label htmlFor="status" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Статус</label>
             <select name="status" id="status" value={formData.status} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200">
-              {Object.values(StationStatus).map(status => (
+              {Object.values(StationStatus).filter(s => s !== StationStatus.REMOVED).map(status => (
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>

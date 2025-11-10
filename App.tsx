@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Station, StationStatus } from './types';
+import { Station, StationStatus, HistoryEntry, FreeUser } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
 import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon } from './components/Icons';
@@ -19,10 +19,14 @@ const INITIAL_STATIONS: Station[] = [
     coordinates: { lat: 55.7558, lng: 37.6173 },
     sid: 'SID-MOS-001',
     did: 'DID-CAFE-A1',
+    sim: '89161234567',
     freeUsers: [
       {id: '1a', fullName: 'Ирина Петрова', position: 'Менеджер', phone: '+7 916 123-45-67'},
       {id: '1b', fullName: 'Сергей Васильев', position: 'Охрана', phone: '+7 926 765-43-21'}
     ],
+    history: [
+      { id: 'h1', date: '2024-07-15T10:00:00Z', employee: 'Иван Петров', change: 'Станция создана' }
+    ]
   },
   {
     id: '2',
@@ -35,9 +39,13 @@ const INITIAL_STATIONS: Station[] = [
     coordinates: { lat: 59.9343, lng: 30.3351 },
     sid: 'SID-SPB-015',
     did: 'DID-GALLERY-F2',
+    sim: '89217654321',
     freeUsers: [
       {id: '2a', fullName: 'Администрация ТРЦ', position: 'Дежурный администратор', phone: '+7 812 555-00-00'}
     ],
+    history: [
+        { id: 'h2', date: '2024-07-18T12:00:00Z', employee: 'Елена Сидорова', change: 'Станция создана' }
+    ]
   },
   {
     id: '3',
@@ -48,8 +56,69 @@ const INITIAL_STATIONS: Station[] = [
     status: StationStatus.MAINTENANCE,
     notes: 'Один из USB-портов не работает. Требуется замена кабеля.',
     coordinates: null,
+    history: [
+        { id: 'h3b', date: '2024-06-25T15:30:00Z', employee: 'Алексей Иванов', change: 'Статус изменен с "Установлено" на "Обслуживание"' },
+        { id: 'h3a', date: '2024-06-10T09:00:00Z', employee: 'Алексей Иванов', change: 'Станция создана' }
+    ]
   },
 ];
+
+const generateHistoryEntry = (employee: string, change: string): HistoryEntry => ({
+  id: new Date().toISOString() + Math.random(),
+  date: new Date().toISOString(),
+  employee,
+  change,
+});
+
+const diffStations = (oldS: Station, newS: Station): string[] => {
+    const changes: string[] = [];
+    
+    const simpleFields: { key: keyof Station; label: string }[] = [
+        { key: 'locationName', label: 'Название местоположения' },
+        { key: 'address', label: 'Адрес' },
+        { key: 'status', label: 'Статус' },
+        { key: 'notes', label: 'Заметки' },
+        { key: 'sid', label: 'SID' },
+        { key: 'did', label: 'DID' },
+        { key: 'sim', label: 'SIM' },
+        { key: 'installer', label: 'Установщик' },
+        { key: 'installationDate', label: 'Дата установки' },
+    ];
+
+    simpleFields.forEach(({ key, label }) => {
+        const oldVal = oldS[key] as string || '';
+        const newVal = newS[key] as string || '';
+        if (oldVal !== newVal) {
+            changes.push(`${label} изменено с "${oldVal || 'пусто'}" на "${newVal || 'пусто'}"`);
+        }
+    });
+
+    const oldUsers = oldS.freeUsers || [];
+    const newUsers = newS.freeUsers || [];
+    
+    newUsers.forEach(newUser => {
+        const oldUser = oldUsers.find(u => u.id === newUser.id);
+        if (!oldUser) {
+            changes.push(`Добавлен пользователь: ${newUser.fullName}`);
+        } else {
+            const userChanges = [];
+            if (oldUser.fullName !== newUser.fullName) userChanges.push(`ФИО с "${oldUser.fullName}" на "${newUser.fullName}"`);
+            if ((oldUser.position || '') !== (newUser.position || '')) userChanges.push(`должность с "${oldUser.position || 'пусто'}" на "${newUser.position || 'пусто'}"`);
+            if ((oldUser.phone || '') !== (newUser.phone || '')) userChanges.push(`телефон с "${oldUser.phone || 'пусто'}" на "${newUser.phone || 'пусто'}"`);
+            if (userChanges.length > 0) {
+                changes.push(`Изменены данные пользователя ${newUser.fullName}: ${userChanges.join(', ')}`);
+            }
+        }
+    });
+    
+    oldUsers.forEach(oldUser => {
+        if (!newUsers.find(u => u.id === oldUser.id)) {
+            changes.push(`Удален пользователь: ${oldUser.fullName}`);
+        }
+    });
+
+    return changes;
+};
 
 const App: React.FC = () => {
   const [stations, setStations] = useLocalStorage<Station[]>('stations', INITIAL_STATIONS);
@@ -63,6 +132,7 @@ const App: React.FC = () => {
 
   const handleSaveStation = (stationToSave: Station) => {
     const oldStation = stations.find(s => s.id === stationToSave.id);
+    let newHistory: HistoryEntry[] = [...(stationToSave.history || [])];
 
     if (oldStation) { // Редактирование существующей станции
       if (oldStation.status !== StationStatus.REMOVED && stationToSave.status === StationStatus.REMOVED) {
@@ -75,11 +145,20 @@ const App: React.FC = () => {
           stationToSave.status = StationStatus.REMOVED; // Отменяем изменение статуса
         }
       }
-      setStations(stations.map(s => s.id === stationToSave.id ? stationToSave : s));
+      
+      const changes = diffStations(oldStation, stationToSave);
+      if (changes.length > 0) {
+          changes.forEach(change => {
+              newHistory.unshift(generateHistoryEntry(currentEmployee, change));
+          });
+      }
+
+      setStations(stations.map(s => s.id === stationToSave.id ? { ...stationToSave, history: newHistory } : s));
     } else { // Добавление новой станции
       if (inventoryCount > 0) {
         setInventoryCount(prev => prev - 1);
-        setStations([stationToSave, ...stations]);
+        newHistory.unshift(generateHistoryEntry(currentEmployee, "Станция создана"));
+        setStations([{ ...stationToSave, history: newHistory }, ...stations]);
       } else {
         alert("Нельзя добавить станцию: нет в наличии на складе.");
         return; // Прерываем сохранение
@@ -94,23 +173,14 @@ const App: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту станцию? Это действие вернет ее на склад.')) {
-      const stationToDelete = stations.find(s => s.id === id);
-      if (stationToDelete && stationToDelete.status !== StationStatus.REMOVED) {
-        setInventoryCount(prev => prev + 1);
-      }
-      setStations(stations.filter(s => s.id !== id));
-      setSelectedStations(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
+    if (window.confirm('Вы уверены, что хотите удалить эту станцию? Это действие изменит ее статус на "Удалено" и вернет на склад.')) {
+      handleStatusChange(id, StationStatus.REMOVED);
     }
   };
   
   const handleStatusChange = (id: string, status: StationStatus) => {
     const oldStation = stations.find(s => s.id === id);
-    if (!oldStation) return;
+    if (!oldStation || oldStation.status === status) return;
 
     if (oldStation.status !== StationStatus.REMOVED && status === StationStatus.REMOVED) {
         setInventoryCount(prev => prev + 1);
@@ -122,8 +192,13 @@ const App: React.FC = () => {
             return; // Не меняем статус
         }
     }
+    
+    const newHistory = [
+      generateHistoryEntry(currentEmployee, `Статус изменен с "${oldStation.status}" на "${status}"`),
+      ...oldStation.history
+    ];
 
-    setStations(stations.map(s => s.id === id ? { ...s, status } : s));
+    setStations(stations.map(s => s.id === id ? { ...s, status, history: newHistory } : s));
   };
 
   const closeForm = () => {
@@ -153,13 +228,14 @@ const App: React.FC = () => {
       const matchesLocation = station.locationName.toLowerCase().includes(normalizedQuery);
       const matchesSid = station.sid?.toLowerCase().includes(normalizedQuery) ?? false;
       const matchesDid = station.did?.toLowerCase().includes(normalizedQuery) ?? false;
+      const matchesSim = station.sim?.toLowerCase().includes(normalizedQuery) ?? false;
       const matchesDate = new Date(station.installationDate).toLocaleDateString('ru-RU').includes(normalizedQuery);
       const matchesUser = station.freeUsers?.some(user =>
         user.fullName.toLowerCase().includes(normalizedQuery) ||
         (user.phone && user.phone.replace(/\D/g, '').includes(queryDigits) && queryDigits.length > 0)
       ) ?? false;
 
-      return matchesLocation || matchesSid || matchesDid || matchesDate || matchesUser;
+      return matchesLocation || matchesSid || matchesDid || matchesSim || matchesDate || matchesUser;
     });
   }, [stations, filterStatus, searchQuery]);
 
@@ -204,21 +280,21 @@ const App: React.FC = () => {
 
     const headers = [
       "ID", "Название местоположения", "Адрес", "Установщик", "Дата установки",
-      "Статус", "SID", "DID", "Широта", "Долгота", "Заметки", "Бесплатные пользователи"
+      "Статус", "SID", "DID", "SIM", "Широта", "Долгота", "Заметки", "Бесплатные пользователи"
     ];
 
     const rows = stationsToExport.map(station => {
       const freeUsersString = station.freeUsers?.map(user =>
         `ФИО: ${user.fullName || ''}; Должность: ${user.position || ''}; Телефон: ${user.phone || ''}`
-      ).join('\n') || '';
+      ).join(' | ') || '';
 
       const escapeCSV = (field: string | number | null | undefined) => {
-        if (field === null || field === undefined) return '""';
+        if (field === null || field === undefined) return '';
         const str = String(field);
         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
           return `"${str.replace(/"/g, '""')}"`;
         }
-        return `"${str}"`;
+        return str;
       };
 
       return [
@@ -230,6 +306,7 @@ const App: React.FC = () => {
         escapeCSV(station.status),
         escapeCSV(station.sid),
         escapeCSV(station.did),
+        escapeCSV(station.sim),
         escapeCSV(station.coordinates?.lat),
         escapeCSV(station.coordinates?.lng),
         escapeCSV(station.notes),
