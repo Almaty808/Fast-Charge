@@ -66,3 +66,15 @@ export const ChevronDownIcon = ({ className }: { className?: string }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
     </svg>
 );
+
+export const LogoutIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m-3-3-3 3m0 0 3 3m-3-3H15" />
+    </svg>
+);
+
+export const UsersIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-2.253a9.527 9.527 0 0 0-1.242-1.384l-.32-.285A18.369 18.369 0 0 0 12 12c-3.153 0-6.106 1.01-8.58 2.865a9.527 9.527 0 0 0-1.242 1.384a9.337 9.337 0 0 0 4.121 2.253A9.38 9.38 0 0 0 9 19.128M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+);

@@ -1,11 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Station, StationStatus, HistoryEntry, FreeUser } from './types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon } from './components/Icons';
+import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon, UsersIcon, LogoutIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
+import Auth from './components/Auth';
+import AdminPanel from './components/AdminPanel';
 
-const EMPLOYEES = ['Иван Петров', 'Елена Сидорова', 'Алексей Иванов', 'Ольга Кузнецова'];
 
 const INITIAL_STATIONS: Station[] = [
   {
@@ -123,18 +124,37 @@ const diffStations = (oldS: Station, newS: Station): string[] => {
 const App: React.FC = () => {
   const [stations, setStations] = useLocalStorage<Station[]>('stations', INITIAL_STATIONS);
   const [inventoryCount, setInventoryCount] = useLocalStorage<number>('inventoryCount', 20);
-  const [currentEmployee, setCurrentEmployee] = useState<string>(EMPLOYEES[0]);
+  const [users, setUsers] = useLocalStorage<User[]>('auth_users', []);
+  const [currentUser, setCurrentUser] = useLocalStorage<User | null>('auth_currentUser', null);
+  
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStations, setSelectedStations] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<'app' | 'admin'>('app');
+
+  useEffect(() => {
+    const adminExists = users.some(u => u.role === UserRole.ADMIN);
+    if (!adminExists) {
+      const defaultAdmin: User = {
+        id: 'admin-' + new Date().toISOString(),
+        name: 'Администратор',
+        email: 'admin@example.com',
+        password: 'adminpassword',
+        status: UserStatus.APPROVED,
+        role: UserRole.ADMIN,
+      };
+      setUsers([defaultAdmin, ...users]);
+    }
+  }, [users, setUsers]);
+
 
   const handleSaveStation = (stationToSave: Station) => {
     const oldStation = stations.find(s => s.id === stationToSave.id);
     let newHistory: HistoryEntry[] = [...(stationToSave.history || [])];
 
-    if (oldStation) { // Редактирование существующей станции
+    if (oldStation) { 
       if (oldStation.status !== StationStatus.REMOVED && stationToSave.status === StationStatus.REMOVED) {
         setInventoryCount(prev => prev + 1);
       } else if (oldStation.status === StationStatus.REMOVED && stationToSave.status !== StationStatus.REMOVED) {
@@ -142,26 +162,26 @@ const App: React.FC = () => {
           setInventoryCount(prev => prev - 1);
         } else {
           alert("Нет станций в остатке для повторной установки!");
-          stationToSave.status = StationStatus.REMOVED; // Отменяем изменение статуса
+          stationToSave.status = StationStatus.REMOVED; 
         }
       }
       
       const changes = diffStations(oldStation, stationToSave);
       if (changes.length > 0) {
           changes.forEach(change => {
-              newHistory.unshift(generateHistoryEntry(currentEmployee, change));
+              newHistory.unshift(generateHistoryEntry(currentUser!.name, change));
           });
       }
 
       setStations(stations.map(s => s.id === stationToSave.id ? { ...stationToSave, history: newHistory } : s));
-    } else { // Добавление новой станции
+    } else { 
       if (inventoryCount > 0) {
         setInventoryCount(prev => prev - 1);
-        newHistory.unshift(generateHistoryEntry(currentEmployee, "Станция создана"));
+        newHistory.unshift(generateHistoryEntry(currentUser!.name, "Станция создана"));
         setStations([{ ...stationToSave, history: newHistory }, ...stations]);
       } else {
         alert("Нельзя добавить станцию: нет в наличии на складе.");
-        return; // Прерываем сохранение
+        return;
       }
     }
     closeForm();
@@ -189,12 +209,12 @@ const App: React.FC = () => {
             setInventoryCount(prev => prev - 1);
         } else {
             alert("Нет станций в остатке для повторной установки!");
-            return; // Не меняем статус
+            return; 
         }
     }
     
     const newHistory = [
-      generateHistoryEntry(currentEmployee, `Статус изменен с "${oldStation.status}" на "${status}"`),
+      generateHistoryEntry(currentUser!.name, `Статус изменен с "${oldStation.status}" на "${status}"`),
       ...oldStation.history
     ];
 
@@ -256,14 +276,12 @@ const App: React.FC = () => {
     const allDisplayedSelected = displayedStations.length > 0 && displayedStations.every(s => selectedStations.has(s.id));
   
     if (allDisplayedSelected) {
-      // Deselect all displayed
       setSelectedStations(prev => {
         const newSet = new Set(prev);
         displayedIds.forEach(id => newSet.delete(id));
         return newSet;
       });
     } else {
-      // Select all displayed
       setSelectedStations(prev => {
         const newSet = new Set(prev);
         displayedIds.forEach(id => newSet.add(id));
@@ -327,24 +345,66 @@ const App: React.FC = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  // Auth handlers
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setView('app');
+  };
+
+  if (!currentUser) {
+    return <Auth onLogin={handleLogin} users={users} setUsers={setUsers} />;
+  }
+
+  if (currentUser.status === UserStatus.PENDING) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4">
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-lg text-center">
+            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400 mb-4">Ожидание подтверждения</h1>
+            <p className="text-slate-600 dark:text-slate-300 mb-6">Ваша учетная запись ожидает подтверждения администратором. Пожалуйста, попробуйте войти позже.</p>
+            <button
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+            >
+                <LogoutIcon className="w-5 h-5" />
+                <span>Выйти</span>
+            </button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (currentUser.role === UserRole.ADMIN && view === 'admin') {
+      return <AdminPanel users={users} setUsers={setUsers} onBack={() => setView('app')} />;
+  }
   
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
       <header className="bg-white dark:bg-slate-800 shadow-md sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Учет Зарядных Станций</h1>
-          <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 p-2 rounded-md bg-slate-100 dark:bg-slate-700">
                 <PackageIcon className="w-6 h-6 text-primary-500" />
                 <span>В остатке: {inventoryCount}</span>
             </div>
-            <select
-              value={currentEmployee}
-              onChange={(e) => setCurrentEmployee(e.target.value)}
-              className="block w-full sm:w-auto text-sm rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200"
-            >
-              {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
-            </select>
+             <div className="flex-grow sm:flex-grow-0 text-center sm:text-left">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {currentUser.name}
+                </span>
+             </div>
+             {currentUser.role === UserRole.ADMIN && (
+                 <button onClick={() => setView('admin')} className="p-2 text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors" title="Управление пользователями">
+                     <UsersIcon className="w-6 h-6" />
+                 </button>
+             )}
+             <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-500 transition-colors" title="Выйти">
+                <LogoutIcon className="w-6 h-6" />
+            </button>
             <button
               onClick={openForm}
               disabled={inventoryCount <= 0}
@@ -352,7 +412,7 @@ const App: React.FC = () => {
               title={inventoryCount <= 0 ? "Нет станций в наличии" : "Добавить новую станцию"}
             >
               <PlusIcon className="w-5 h-5" />
-              <span className="hidden sm:inline">Добавить станцию</span>
+              <span className="hidden sm:inline">Добавить</span>
             </button>
           </div>
         </div>
@@ -431,7 +491,7 @@ const App: React.FC = () => {
       {isFormOpen && (
         <StationForm
           station={editingStation}
-          currentEmployee={currentEmployee}
+          currentUserName={currentUser.name}
           onSave={handleSaveStation}
           onClose={closeForm}
         />

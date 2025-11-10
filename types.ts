@@ -34,3 +34,22 @@ export interface Station {
   freeUsers?: FreeUser[];
   history: HistoryEntry[];
 }
+
+export enum UserStatus {
+  PENDING = 'Ожидание',
+  APPROVED = 'Подтвержден',
+}
+
+export enum UserRole {
+  USER = 'Пользователь',
+  ADMIN = 'Администратор',
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // Should be hashed in a real app
+  status: UserStatus;
+  role: UserRole;
+}

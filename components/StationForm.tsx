@@ -5,18 +5,18 @@ import { SparklesIcon, PlusIcon, TrashIcon } from './Icons';
 
 interface StationFormProps {
   station: Station | null;
-  currentEmployee: string;
+  currentUserName: string;
   onSave: (station: Station) => void;
   onClose: () => void;
 }
 
 type FormData = Omit<Station, 'id' | 'history'>;
 
-const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onSave, onClose }) => {
+const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onSave, onClose }) => {
   const [formData, setFormData] = useState<FormData>({
     locationName: '',
     address: '',
-    installer: currentEmployee,
+    installer: currentUserName,
     installationDate: new Date().toISOString().split('T')[0],
     status: StationStatus.PLANNED,
     notes: '',
@@ -42,7 +42,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
         setFormData({
             locationName: '',
             address: '',
-            installer: currentEmployee,
+            installer: currentUserName,
             installationDate: new Date().toISOString().split('T')[0],
             status: StationStatus.PLANNED,
             notes: '',
@@ -53,7 +53,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentEmployee, onS
             freeUsers: [],
         });
     }
-  }, [station, currentEmployee]);
+  }, [station, currentUserName]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
