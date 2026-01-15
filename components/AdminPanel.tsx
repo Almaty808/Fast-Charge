@@ -17,7 +17,8 @@ import {
     BellIcon,
     EnvelopeIcon,
     HistoryIcon,
-    DownloadIcon
+    DownloadIcon,
+    ChevronDownIcon
 } from './Icons';
 import StatusBadge from './StatusBadge';
 
@@ -59,6 +60,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [msgBody, setMsgBody] = useState('');
     const [showInviteToast, setShowInviteToast] = useState(false);
     
+    // Invite Modal State
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState('');
+
     // Group Form State
     const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
     const [editingGroup, setEditingGroup] = useState<UserGroup | null>(null);
@@ -85,17 +90,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    const handleInvite = () => {
-        const url = window.location.origin;
+    const handleGenerateInvite = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inviteEmail) return;
         
-        // Современный метод
+        // Кодируем email для ссылки
+        const encodedEmail = btoa(inviteEmail);
+        const url = `${window.location.origin}?invite=${encodedEmail}`;
+        
+        copyToClipboard(url);
+        setIsInviteModalOpen(false);
+        setInviteEmail('');
+    };
+
+    const copyToClipboard = (text: string) => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(() => {
+            navigator.clipboard.writeText(text).then(() => {
                 setShowInviteToast(true);
                 setTimeout(() => setShowInviteToast(false), 3000);
-            }).catch(() => fallbackCopy(url));
+            }).catch(() => fallbackCopy(text));
         } else {
-            fallbackCopy(url);
+            fallbackCopy(text);
         }
     };
 
@@ -109,7 +124,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             setShowInviteToast(true);
             setTimeout(() => setShowInviteToast(false), 3000);
         } catch (err) {
-            alert('Не удалось скопировать ссылку. Скопируйте адресную строку браузера вручную.');
+            alert('Не удалось скопировать ссылку. Скопируйте её вручную: ' + text);
         }
         document.body.removeChild(textArea);
     };
@@ -253,13 +268,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <div className="space-y-6">
                     <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary-500/20">
-                        <h4 className="text-lg font-black mb-2 tracking-tight">Инвайт-ссылка</h4>
-                        <p className="text-xs opacity-80 mb-6 font-medium">Отправьте эту ссылку новому сотруднику для регистрации.</p>
+                        <h4 className="text-lg font-black mb-2 tracking-tight">Инвайт-система</h4>
+                        <p className="text-xs opacity-80 mb-6 font-medium text-indigo-50 leading-relaxed">Создайте персональную ссылку для регистрации нового сотрудника.</p>
                         <button 
-                            onClick={handleInvite} 
-                            className="w-full py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95"
+                            onClick={() => setIsInviteModalOpen(true)} 
+                            className="w-full py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95 flex items-center justify-center gap-2"
                         >
-                            Копировать ссылку
+                            <EnvelopeIcon className="w-4 h-4" /> Пригласить по Email
                         </button>
                     </div>
                     
@@ -276,7 +291,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-500 font-bold">Версия</span>
-                                <span className="text-slate-400 font-black">2.5.3-pro</span>
+                                <span className="text-slate-400 font-black">2.5.4-pro</span>
                             </div>
                         </div>
                     </div>
@@ -302,7 +317,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         />
                     </div>
                     <button 
-                        onClick={handleInvite}
+                        onClick={() => setIsInviteModalOpen(true)}
                         className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
                         <PlusIcon className="w-5 h-5" /> Пригласить сотрудника
@@ -321,9 +336,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 font-black text-3xl shrink-0">
                                         {u.name.charAt(0)}
                                     </div>
-                                    <div className="flex-1 text-center md:text-left">
-                                        <h4 className="text-xl font-black text-slate-900 dark:text-white">{u.name}</h4>
-                                        <p className="text-sm text-slate-500 font-medium mb-2">{u.email} • {u.phone}</p>
+                                    <div className="flex-1 text-center md:text-left min-w-0">
+                                        <h4 className="text-xl font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
+                                        <p className="text-sm text-slate-500 font-medium mb-2 truncate">{u.email} • {u.phone}</p>
                                         <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg">Новый сотрудник</span>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
@@ -648,7 +663,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
             </main>
 
-            {/* Modals */}
+            {/* Invite User Modal */}
+            {isInviteModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[130] flex items-center justify-center p-6">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
+                        <div className="flex justify-between items-center mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center">
+                                    <EnvelopeIcon className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white">Приглашение</h3>
+                            </div>
+                            <button onClick={() => setIsInviteModalOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors">✕</button>
+                        </div>
+                        <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">Введите Email сотрудника. Мы создадим специальную ссылку, по которой он сможет зарегистрироваться.</p>
+                        <form onSubmit={handleGenerateInvite} className="space-y-6">
+                            <input 
+                                type="email" 
+                                required 
+                                value={inviteEmail} 
+                                onChange={e => setInviteEmail(e.target.value)} 
+                                placeholder="example@fastcharge.com" 
+                                className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all"
+                            />
+                            <button 
+                                type="submit" 
+                                className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all"
+                            >
+                                Сгенерировать ссылку
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Group Modal */}
             {isGroupFormOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
@@ -692,6 +741,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
             )}
 
+            {/* Message Modal */}
             {msgModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">

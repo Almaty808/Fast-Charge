@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserStatus, UserRole } from '../types';
 
 interface AuthProps {
@@ -15,6 +15,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [error, setError] = useState('');
+    const [isInvited, setIsInvited] = useState(false);
+
+    useEffect(() => {
+        // Проверяем наличие параметра invite в URL
+        const params = new URLSearchParams(window.location.search);
+        const inviteCode = params.get('invite');
+        if (inviteCode) {
+            try {
+                const decodedEmail = atob(inviteCode);
+                setEmail(decodedEmail);
+                setIsLoginView(false); // Переключаем на регистрацию
+                setIsInvited(true);    // Блокируем поле email
+            } catch (e) {
+                console.error("Invalid invite code");
+            }
+        }
+    }, []);
 
     const handleLoginSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -48,6 +65,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
         onRegister(newUser);
         alert('Заявка на регистрацию отправлена. Администратор подтвердит ваш доступ в ближайшее время.');
         setIsLoginView(true);
+        setIsInvited(false);
     };
 
     return (
@@ -66,6 +84,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Fast Charge</h1>
                         <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">Enterprise Solution</p>
                     </div>
+
+                    {isInvited && !isLoginView && (
+                        <div className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 rounded-2xl text-primary-600 dark:text-primary-300 text-xs font-bold text-center animate-fade-in">
+                            ✨ Вы приглашены в команду!
+                        </div>
+                    )}
 
                     {error && (
                         <div className="mb-8 p-5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-sm font-bold text-center rounded-[1.5rem] animate-fade-in">
@@ -97,10 +121,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                         <input
                             type="email"
                             required
+                            readOnly={isInvited && !isLoginView}
                             placeholder="Email адрес"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
+                            className={`w-full px-6 py-5 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white ${isInvited && !isLoginView ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed opacity-70' : 'bg-slate-50 dark:bg-slate-800'}`}
                         />
                         <input
                             type="password"
@@ -115,13 +140,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                             type="submit"
                             className="w-full py-5 bg-primary-600 hover:bg-primary-700 text-white rounded-3xl text-base font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 transition-all active:scale-[0.97] mt-6"
                         >
-                            {isLoginView ? 'Войти в систему' : 'Создать аккаунт'}
+                            {isLoginView ? 'Войти в систему' : 'Отправить заявку'}
                         </button>
                     </form>
 
                     <div className="mt-12 pt-10 border-t border-slate-50 dark:border-slate-800 flex flex-col items-center gap-5">
                         <button 
-                            onClick={() => setIsLoginView(!isLoginView)}
+                            onClick={() => { setIsLoginView(!isLoginView); if(isLoginView) setIsInvited(false); }}
                             className="text-sm font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors"
                         >
                             {isLoginView ? 'Ещё нет аккаунта? Регистрация' : 'Уже есть аккаунт? Войти'}
