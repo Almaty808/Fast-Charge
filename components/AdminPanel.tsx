@@ -17,8 +17,7 @@ import {
     BellIcon,
     EnvelopeIcon,
     HistoryIcon,
-    DownloadIcon,
-    PlusIcon as InviteIcon
+    DownloadIcon
 } from './Icons';
 import StatusBadge from './StatusBadge';
 
@@ -88,10 +87,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleInvite = () => {
         const url = window.location.origin;
-        navigator.clipboard.writeText(url).then(() => {
+        
+        // Современный метод
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                setShowInviteToast(true);
+                setTimeout(() => setShowInviteToast(false), 3000);
+            }).catch(() => fallbackCopy(url));
+        } else {
+            fallbackCopy(url);
+        }
+    };
+
+    const fallbackCopy = (text: string) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
             setShowInviteToast(true);
             setTimeout(() => setShowInviteToast(false), 3000);
-        });
+        } catch (err) {
+            alert('Не удалось скопировать ссылку. Скопируйте адресную строку браузера вручную.');
+        }
+        document.body.removeChild(textArea);
     };
 
     const handleSend = () => {
@@ -138,7 +158,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const renderDashboard = () => (
         <div className="space-y-6">
-            {/* ПРИОРИТЕТНЫЙ БЛОК: НОВЫЕ ЗАЯВКИ */}
             {pendingUsers.length > 0 && (
                 <div className="bg-rose-600 rounded-[2.5rem] p-8 md:p-10 text-white shadow-[0_20px_50px_rgba(225,29,72,0.3)] animate-slide-up border-4 border-rose-500/50">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8">
@@ -233,7 +252,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2rem] p-8 text-white shadow-xl shadow-primary-500/20">
+                    <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary-500/20">
                         <h4 className="text-lg font-black mb-2 tracking-tight">Инвайт-ссылка</h4>
                         <p className="text-xs opacity-80 mb-6 font-medium">Отправьте эту ссылку новому сотруднику для регистрации.</p>
                         <button 
@@ -242,7 +261,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         >
                             Копировать ссылку
                         </button>
-                        {showInviteToast && <p className="text-[10px] font-black text-center mt-3 animate-fade-in">Ссылка скопирована!</p>}
                     </div>
                     
                     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
@@ -258,7 +276,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-500 font-bold">Версия</span>
-                                <span className="text-slate-400 font-black">2.5.2-pro</span>
+                                <span className="text-slate-400 font-black">2.5.3-pro</span>
                             </div>
                         </div>
                     </div>
@@ -285,7 +303,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <button 
                         onClick={handleInvite}
-                        className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3"
+                        className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3 active:scale-95"
                     >
                         <PlusIcon className="w-5 h-5" /> Пригласить сотрудника
                     </button>
@@ -427,23 +445,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className="py-12 text-center text-slate-400 italic text-sm font-medium">Нет активных задач</div>
                                 )}
                             </div>
-                            
-                            {userStations.length > 0 && (
-                                <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Прогресс установки</span>
-                                        <span className="text-[9px] font-black text-emerald-500">
-                                            {Math.round((userStations.filter(s => s.status === StationStatus.INSTALLED).length / userStations.length) * 100)}%
-                                        </span>
-                                    </div>
-                                    <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
-                                            style={{ width: `${(userStations.filter(s => s.status === StationStatus.INSTALLED).length / userStations.length) * 100}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
@@ -495,6 +496,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
             
+            {/* Глобальный тост подтверждения */}
+            {showInviteToast && (
+                <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl animate-slide-up flex items-center gap-3">
+                    <CheckIcon className="w-5 h-5" />
+                    Ссылка скопирована!
+                </div>
+            )}
+
             {/* Sidebar - Desktop Version */}
             <aside className="hidden md:flex flex-col w-72 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 fixed h-full z-50">
                 <div className="p-8 pb-12 flex items-center gap-3">
@@ -633,34 +642,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    )}
-                    {activeTab === 'settings' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white dark:bg-slate-800 p-12 rounded-[3rem] text-center shadow-sm border border-slate-100 dark:border-slate-700">
-                                <div className="w-20 h-20 bg-primary-50 dark:bg-primary-900/20 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-                                    <PackageIcon className="w-10 h-10 text-primary-600" />
-                                </div>
-                                <h4 className="text-sm font-black uppercase text-slate-400 tracking-widest mb-2">Запасы Fast Charge</h4>
-                                <div className="text-8xl font-black text-primary-600 tracking-tighter mb-8">{inventoryCount}</div>
-                                <div className="flex gap-4 justify-center">
-                                    <button onClick={() => setInventoryCount(c => Math.max(0, c - 1))} className="w-20 h-20 rounded-[1.5rem] bg-rose-50 dark:bg-rose-900/20 text-rose-600 flex items-center justify-center text-3xl font-black shadow-sm active:scale-95 transition-transform">-1</button>
-                                    <button onClick={() => setInventoryCount(c => c + 1)} className="w-20 h-20 rounded-[1.5rem] bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center text-3xl font-black shadow-sm active:scale-95 transition-transform">+1</button>
-                                </div>
-                            </div>
-                            <div className="bg-white dark:bg-slate-800 p-12 rounded-[3rem] shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col justify-center">
-                                <h4 className="text-lg font-black text-slate-900 dark:text-white mb-6">Настройки системы</h4>
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl">
-                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-200">Email уведомления</div>
-                                        <div className="w-12 h-6 bg-primary-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div>
-                                    </div>
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl">
-                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-200">Автоматический ИИ помощник</div>
-                                        <div className="w-12 h-6 bg-primary-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" /></div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
