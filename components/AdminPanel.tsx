@@ -141,7 +141,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const handleGenerateInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail) return;
-        const code = btoa(inviteEmail);
+        const code = btoa(inviteEmail.toLowerCase().trim());
         const url = `${window.location.origin}${window.location.pathname}?invite=${code}`;
         navigator.clipboard.writeText(url).then(() => {
             setShowInviteToast(true);
@@ -163,28 +163,59 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const handleOpenUserModal = (user: User | null = null) => {
         if (user) {
             setEditingUser(user);
-            setUserData({ name: user.name, email: user.email, phone: user.phone, password: user.password, role: user.role, groupId: user.groupId || '' });
+            setUserData({ 
+                name: user.name, 
+                email: user.email, 
+                phone: user.phone, 
+                password: user.password, 
+                role: user.role, 
+                groupId: user.groupId || '' 
+            });
         } else {
             setEditingUser(null);
-            setUserData({ name: '', email: '', phone: '', password: '', role: UserRole.INSTALLER, groupId: '' });
+            setUserData({ 
+                name: '', 
+                email: '', 
+                phone: '', 
+                password: '', 
+                role: UserRole.INSTALLER, 
+                groupId: '' 
+            });
         }
         setIsAddUserModalOpen(true);
     };
 
     const handleSaveUser = () => {
-        if (!userData.email || !userData.name || !userData.password) {
+        // Нормализация перед сохранением критически важна
+        const normalizedEmail = userData.email.toLowerCase().trim();
+        const cleanPassword = userData.password.trim();
+
+        if (!normalizedEmail || !userData.name || !cleanPassword) {
             alert('Заполните обязательные поля: Имя, Email и Пароль');
             return;
         }
 
         if (editingUser) {
-            setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...userData } : u));
+            setUsers(prev => prev.map(u => u.id === editingUser.id ? { 
+                ...u, 
+                ...userData, 
+                email: normalizedEmail,
+                password: cleanPassword 
+            } : u));
             onSendMessage(`Ваш профиль был обновлен администратором.`, 'info', editingUser.id);
         } else {
+            // Проверка на дубликаты
+            if (users.some(u => u.email.toLowerCase().trim() === normalizedEmail)) {
+                alert('Пользователь с таким Email уже существует!');
+                return;
+            }
+
             const newUser: User = {
                 id: 'u-' + Date.now(),
                 ...userData,
-                status: UserStatus.APPROVED
+                email: normalizedEmail,
+                password: cleanPassword,
+                status: UserStatus.APPROVED // Созданные админом сразу активны
             };
             setUsers(prev => [...prev, newUser]);
             onSendMessage(`Администратор добавил нового сотрудника: ${newUser.name}`, 'success', '');

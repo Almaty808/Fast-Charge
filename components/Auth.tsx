@@ -18,15 +18,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
     const [isInvited, setIsInvited] = useState(false);
 
     useEffect(() => {
-        // Проверяем наличие параметра invite в URL
         const params = new URLSearchParams(window.location.search);
         const inviteCode = params.get('invite');
         if (inviteCode) {
             try {
                 const decodedEmail = atob(inviteCode);
-                setEmail(decodedEmail);
-                setIsLoginView(false); // Переключаем на регистрацию
-                setIsInvited(true);    // Блокируем поле email
+                setEmail(decodedEmail.toLowerCase().trim());
+                setIsLoginView(false);
+                setIsInvited(true);
             } catch (e) {
                 console.error("Invalid invite code");
             }
@@ -36,28 +35,39 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
     const handleLoginSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        const user = users.find(u => u.email === email && u.password === password);
+        
+        // Нормализуем ввод для точного сравнения
+        const searchEmail = email.toLowerCase().trim();
+        const searchPassword = password.trim();
+
+        const user = users.find(u => 
+            u.email.toLowerCase().trim() === searchEmail && 
+            u.password === searchPassword
+        );
+
         if (user) {
             onLogin(user);
         } else {
-            setError('Неверные учетные данные. Пожалуйста, попробуйте еще раз.');
+            setError('Неверные учетные данные. Проверьте Email и пароль. Помните, что пароль чувствителен к регистру.');
         }
     };
 
     const handleRegisterSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        if (users.some(u => u.email === email)) {
+        const normalizedEmail = email.toLowerCase().trim();
+
+        if (users.some(u => u.email.toLowerCase().trim() === normalizedEmail)) {
             setError('Эта почта уже зарегистрирована.');
             return;
         }
 
         const newUser: User = {
             id: 'u-' + Math.random().toString(36).substring(2, 9),
-            name,
-            email,
-            phone,
-            password,
+            name: name.trim(),
+            email: normalizedEmail,
+            phone: phone.trim(),
+            password: password, // Пароли не нормализуем, сохраняем как есть
             status: UserStatus.PENDING,
             role: UserRole.USER,
         };
@@ -82,7 +92,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                             </svg>
                         </div>
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Fast Charge</h1>
-                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">Enterprise Solution</p>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">Smart Network Solutions</p>
                     </div>
 
                     {isInvited && !isLoginView && (
@@ -110,7 +120,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                                 />
                                 <input
                                     type="tel"
-                                    required
                                     placeholder="Контактный телефон"
                                     value={phone}
                                     onChange={e => setPhone(e.target.value)}
@@ -130,7 +139,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                         <input
                             type="password"
                             required
-                            placeholder="Ваш пароль"
+                            placeholder="Пароль"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
@@ -151,11 +160,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                         >
                             {isLoginView ? 'Ещё нет аккаунта? Регистрация' : 'Уже есть аккаунт? Войти'}
                         </button>
-                        <div className="flex items-center gap-3">
-                            <span className="w-8 h-[1px] bg-slate-200 dark:bg-slate-800"></span>
-                            <p className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.25em]">Powered by Gemini AI</p>
-                            <span className="w-8 h-[1px] bg-slate-200 dark:bg-slate-800"></span>
-                        </div>
                     </div>
                 </div>
             </div>
