@@ -36,12 +36,16 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
   <body class="bg-slate-50 dark:bg-slate-900">
     <div id="root"></div>
+    <!-- Явное подключение точки входа для инструментов сборки -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
