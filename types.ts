@@ -87,6 +87,13 @@ export interface AppNotification {
   targetUserId?: string; 
 }
 
+export enum InventoryStatus {
+  IN_STOCK = 'В наличии',
+  LOW = 'Мало',
+  OUT = 'Отсутствует',
+  ORDERED = 'Заказано',
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -94,6 +101,7 @@ export interface InventoryItem {
   quantity: number;
   minThreshold: number;
   unit: string;
+  status: InventoryStatus;
   lastUpdated: string;
 }
 

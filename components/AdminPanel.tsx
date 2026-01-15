@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, UserStatus, UserRole, Station, StationStatus, AppNotification, UserGroup, AppPermission, InventoryItem, StockLog } from '../types';
+import { User, UserStatus, UserRole, Station, StationStatus, AppNotification, UserGroup, AppPermission, InventoryItem, StockLog, InventoryStatus } from '../types';
 import { 
     UsersIcon, 
     ChartIcon, 
@@ -68,15 +68,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     // Inventory State
     const [inventoryItems, setInventoryItems] = useLocalStorage<InventoryItem[]>('app_inventory_items', [
-        { id: 'inv-1', name: 'Зарядные станции v2.5', category: 'hardware', quantity: 45, minThreshold: 10, unit: 'шт', lastUpdated: new Date().toISOString() },
-        { id: 'inv-2', name: 'Кабели Lightning MFi', category: 'cables', quantity: 120, minThreshold: 30, unit: 'шт', lastUpdated: new Date().toISOString() },
-        { id: 'inv-3', name: 'Кабели Type-C 20W', category: 'cables', quantity: 85, minThreshold: 25, unit: 'шт', lastUpdated: new Date().toISOString() },
-        { id: 'inv-4', name: 'SIM-карты (M2M)', category: 'sim', quantity: 32, minThreshold: 15, unit: 'шт', lastUpdated: new Date().toISOString() },
-        { id: 'inv-5', name: 'Брендированные наклейки', category: 'marketing', quantity: 200, minThreshold: 50, unit: 'уп', lastUpdated: new Date().toISOString() },
+        { id: 'inv-1', name: 'Зарядные станции v2.5', category: 'hardware', quantity: 45, minThreshold: 10, unit: 'шт', status: InventoryStatus.IN_STOCK, lastUpdated: new Date().toISOString() },
+        { id: 'inv-2', name: 'Кабели Lightning MFi', category: 'cables', quantity: 120, minThreshold: 30, unit: 'шт', status: InventoryStatus.IN_STOCK, lastUpdated: new Date().toISOString() },
+        { id: 'inv-3', name: 'Кабели Type-C 20W', category: 'cables', quantity: 85, minThreshold: 25, unit: 'шт', status: InventoryStatus.IN_STOCK, lastUpdated: new Date().toISOString() },
+        { id: 'inv-4', name: 'SIM-карты (M2M)', category: 'sim', quantity: 32, minThreshold: 15, unit: 'шт', status: InventoryStatus.IN_STOCK, lastUpdated: new Date().toISOString() },
+        { id: 'inv-5', name: 'Брендированные наклейки', category: 'marketing', quantity: 200, minThreshold: 50, unit: 'уп', status: InventoryStatus.IN_STOCK, lastUpdated: new Date().toISOString() },
     ]);
     const [stockLogs, setStockLogs] = useLocalStorage<StockLog[]>('app_stock_logs', []);
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Inventory Edit State
+    const [editingInvItem, setEditingInvItem] = useState<InventoryItem | null>(null);
+    const [invFormData, setInvFormData] = useState<Partial<InventoryItem>>({});
 
     const pendingUsers = useMemo(() => users.filter(u => u.status === UserStatus.PENDING), [users]);
     const activeUsers = useMemo(() => users.filter(u => u.status === UserStatus.APPROVED), [users]);
@@ -113,6 +117,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }));
     };
 
+    const handleSaveInventoryDetails = () => {
+        if (!editingInvItem || !invFormData.name) return;
+
+        setInventoryItems(prev => prev.map(item => 
+            item.id === editingInvItem.id ? { ...item, ...invFormData, lastUpdated: new Date().toISOString() } : item
+        ));
+
+        // Логируем изменение деталей
+        const log: StockLog = {
+            id: 'log-edit-' + Date.now(),
+            itemId: editingInvItem.id,
+            itemName: invFormData.name || editingInvItem.name,
+            change: 0,
+            author: 'Администратор',
+            timestamp: new Date().toISOString()
+        };
+        setStockLogs([log, ...stockLogs.slice(0, 49)]);
+
+        setEditingInvItem(null);
+    };
+
     const handleAiAnalysis = async () => {
         setIsAnalyzing(true);
         try {
@@ -125,7 +150,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    // User CRUD logic
     const handleOpenUserModal = (user: User | null = null) => {
         if (user) {
             setEditingUser(user);
@@ -155,35 +179,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleSaveUser = () => {
         const normalizedLoginId = userData.loginId.toLowerCase().trim();
-
         if (!normalizedLoginId || !userData.name || !userData.password) {
             alert('Заполните обязательные поля: ID, Имя и Пароль');
             return;
         }
-
         if (editingUser) {
-            setUsers(prev => prev.map(u => u.id === editingUser.id ? { 
-                ...u, 
-                ...userData, 
-                loginId: normalizedLoginId,
-                status: UserStatus.APPROVED
-            } : u));
+            setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...userData, loginId: normalizedLoginId, status: UserStatus.APPROVED } : u));
             onSendMessage(`Ваш профиль обновлен. Ваш ID для входа: ${normalizedLoginId}`, 'info', editingUser.id);
         } else {
             if (users.some(u => u.loginId.toLowerCase().trim() === normalizedLoginId)) {
                 alert('Пользователь с таким ID уже существует!');
                 return;
             }
-
-            const newUser: User = {
-                id: 'u-' + Date.now(),
-                ...userData,
-                loginId: normalizedLoginId,
-                status: UserStatus.APPROVED
-            };
+            const newUser: User = { id: 'u-' + Date.now(), ...userData, loginId: normalizedLoginId, status: UserStatus.APPROVED };
             setUsers(prev => [...prev, newUser]);
         }
         setIsAddUserModalOpen(false);
+    };
+
+    const getInvStatusColor = (status: InventoryStatus) => {
+        switch (status) {
+            case InventoryStatus.IN_STOCK: return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+            case InventoryStatus.LOW: return 'bg-amber-50 text-amber-600 border-amber-100';
+            case InventoryStatus.OUT: return 'bg-rose-50 text-rose-600 border-rose-100';
+            case InventoryStatus.ORDERED: return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+            default: return 'bg-slate-50 text-slate-600 border-slate-100';
+        }
     };
 
     const menuItems: AdminMenuItem[] = [
@@ -197,7 +218,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const renderUsers = () => {
         const filteredPending = pendingUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.loginId.toLowerCase().includes(userSearch.toLowerCase()));
         const filteredActive = activeUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.loginId.toLowerCase().includes(userSearch.toLowerCase()));
-
         return (
             <div className="space-y-12">
                 <div className="flex flex-col lg:flex-row gap-6 items-center justify-between">
@@ -209,32 +229,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <PlusIcon className="w-5 h-5" /> Создать новый аккаунт
                     </button>
                 </div>
-
                 {filteredPending.length > 0 && (
                     <div className="space-y-6">
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2 flex items-center gap-3">
-                            <div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />
-                            Новые заявки ({filteredPending.length})
-                        </h3>
+                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2 flex items-center gap-3"><div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />Новые заявки ({filteredPending.length})</h3>
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                             {filteredPending.map(u => (
                                 <div key={u.id} className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-xl flex flex-col md:flex-row gap-6 items-center animate-scale-in">
                                     <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 font-black text-3xl shrink-0">{u.name.charAt(0)}</div>
-                                    <div className="flex-1 text-center md:text-left min-w-0">
-                                        <h4 className="text-xl font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
-                                        <p className="text-sm text-slate-500 font-medium mb-1">ID (временный): {u.loginId}</p>
-                                        <p className="text-xs text-slate-400 font-medium truncate">{u.email}</p>
-                                    </div>
-                                    <div className="flex gap-2 w-full md:w-auto">
-                                        <button onClick={() => handleApprove(u.id)} className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Одобрить</button>
-                                        <button onClick={() => { if(confirm('Удалить?')) setUsers(prev => prev.filter(p => p.id !== u.id)) }} className="p-4 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"><TrashIcon className="w-6 h-6" /></button>
-                                    </div>
+                                    <div className="flex-1 text-center md:text-left min-w-0"><h4 className="text-xl font-black text-slate-900 dark:text-white truncate">{u.name}</h4><p className="text-sm text-slate-500 font-medium mb-1">ID (временный): {u.loginId}</p><p className="text-xs text-slate-400 font-medium truncate">{u.email}</p></div>
+                                    <div className="flex gap-2 w-full md:w-auto"><button onClick={() => handleApprove(u.id)} className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Одобрить</button><button onClick={() => { if(confirm('Удалить?')) setUsers(prev => prev.filter(p => p.id !== u.id)) }} className="p-4 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"><TrashIcon className="w-6 h-6" /></button></div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-
                 <div className="space-y-6">
                     <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2">Список сотрудников ({activeUsers.length})</h3>
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -242,16 +250,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
                                 <div className="flex items-center gap-5 flex-1 min-w-0">
                                     <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0 ${u.role === UserRole.ADMIN ? 'bg-gradient-to-br from-rose-500 to-rose-700' : 'bg-gradient-to-br from-primary-500 to-indigo-600'}`}>{u.name.charAt(0)}</div>
-                                    <div className="min-w-0">
-                                        <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
-                                        <p className="text-sm font-black text-primary-600 uppercase tracking-widest">ID: {u.loginId}</p>
-                                        <p className="text-xs text-slate-400 font-medium truncate mt-1">{u.role} • {u.phone}</p>
-                                    </div>
+                                    <div className="min-w-0"><h4 className="text-base font-black text-slate-900 dark:text-white truncate">{u.name}</h4><p className="text-sm font-black text-primary-600 uppercase tracking-widest">ID: {u.loginId}</p><p className="text-xs text-slate-400 font-medium truncate mt-1">{u.role} • {u.phone}</p></div>
                                 </div>
-                                <div className="flex gap-2 shrink-0">
-                                    <button onClick={() => handleOpenUserModal(u)} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-primary-500 hover:bg-primary-50 transition-colors"><EditIcon className="w-5 h-5" /></button>
-                                    <button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl text-red-500 hover:bg-red-100 transition-colors"><TrashIcon className="w-5 h-5" /></button>
-                                </div>
+                                <div className="flex gap-2 shrink-0"><button onClick={() => handleOpenUserModal(u)} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-primary-500 hover:bg-primary-50 transition-colors"><EditIcon className="w-5 h-5" /></button><button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl text-red-500 hover:bg-red-100 transition-colors"><TrashIcon className="w-5 h-5" /></button></div>
                             </div>
                         ))}
                     </div>
@@ -304,10 +305,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div key={item.id} className={`bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 transition-all shadow-sm ${item.quantity <= item.minThreshold ? 'border-rose-500/30 shadow-rose-500/5' : 'border-slate-100 dark:border-slate-800'}`}>
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 flex items-center justify-center"><PackageIcon className="w-6 h-6" /></div>
-                                            <div className="text-right"><p className="text-3xl font-black text-slate-900 dark:text-white leading-none">{item.quantity}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{item.unit}</p></div>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => { setEditingInvItem(item); setInvFormData({ ...item }); }}
+                                                    className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary-600 flex items-center justify-center transition-colors shadow-sm"
+                                                >
+                                                    <EditIcon className="w-5 h-5" />
+                                                </button>
+                                                <div className="text-right"><p className="text-3xl font-black text-slate-900 dark:text-white leading-none">{item.quantity}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{item.unit}</p></div>
+                                            </div>
                                         </div>
                                         <h4 className="text-lg font-black text-slate-800 dark:text-white mb-2">{item.name}</h4>
-                                        <div className="grid grid-cols-2 gap-3 mt-8">
+                                        <div className="flex items-center gap-2 mb-6">
+                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${getInvStatusColor(item.status)}`}>
+                                                {item.status}
+                                            </span>
+                                            {item.quantity <= item.minThreshold && (
+                                                <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Критический запас!</span>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 mt-4">
                                             <button onClick={() => handleUpdateStock(item.id, -1)} className="py-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 font-black hover:bg-rose-50 hover:text-rose-600 transition-all">-1</button>
                                             <button onClick={() => handleUpdateStock(item.id, 1)} className="py-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 font-black hover:bg-emerald-50 hover:text-emerald-600 transition-all">+1</button>
                                         </div>
@@ -320,7 +337,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
             </main>
 
-            {/* Manual User Creation Modal */}
+            {/* Inventory Edit Modal */}
+            {editingInvItem && (
+                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] flex items-center justify-center p-6">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-scale-in border border-white/5">
+                        <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                            <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">Редактор склада</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Детали: {editingInvItem.id}</p></div>
+                            <button onClick={() => setEditingInvItem(null)} className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500">✕</button>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div>
+                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Название товара <span className="text-rose-500">*</span></label>
+                                <input value={invFormData.name} onChange={e => setInvFormData({...invFormData, name: e.target.value})} placeholder="Название..." className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Статус <span className="text-rose-500">*</span></label>
+                                    <select value={invFormData.status} onChange={e => setInvFormData({...invFormData, status: e.target.value as InventoryStatus})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest text-slate-500">
+                                        {Object.values(InventoryStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Категория <span className="text-rose-500">*</span></label>
+                                    <select value={invFormData.category} onChange={e => setInvFormData({...invFormData, category: e.target.value as any})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest text-slate-500">
+                                        <option value="hardware">Оборудование</option>
+                                        <option value="cables">Кабели</option>
+                                        <option value="sim">SIM-карты</option>
+                                        <option value="marketing">Маркетинг</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Мин. порог</label>
+                                    <input type="number" value={invFormData.minThreshold} onChange={e => setInvFormData({...invFormData, minThreshold: parseInt(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ед. изм.</label>
+                                    <input value={invFormData.unit} onChange={e => setInvFormData({...invFormData, unit: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-10 border-t border-slate-100 dark:border-slate-800"><button onClick={handleSaveInventoryDetails} className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all">Обновить данные товара</button></div>
+                    </div>
+                </div>
+            )}
+
+            {/* User Modal */}
             {isAddUserModalOpen && (
                 <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[150] flex items-center justify-center p-6">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-scale-in border border-white/5">
@@ -330,11 +393,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                         <div className="p-10 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2">
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ID для входа <span className="text-rose-500">*</span></label>
-                                    <input value={userData.loginId} onChange={e => setUserData({...userData, loginId: e.target.value.toUpperCase()})} placeholder="FC-101" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-primary-600 focus:ring-4 focus:ring-primary-500/10 transition-all" />
-                                    <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter">Сотрудник будет использовать этот код вместо Email</p>
-                                </div>
+                                <div className="md:col-span-2"><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ID для входа <span className="text-rose-500">*</span></label><input value={userData.loginId} onChange={e => setUserData({...userData, loginId: e.target.value.toUpperCase()})} placeholder="FC-101" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-primary-600 focus:ring-4 focus:ring-primary-500/10 transition-all" /><p className="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter">Сотрудник будет использовать этот код вместо Email</p></div>
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ФИО <span className="text-rose-500">*</span></label><input value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} placeholder="Александр Петров" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Пароль <span className="text-rose-500">*</span></label><input type="text" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} placeholder="Введите пароль" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email</label><input type="email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} placeholder="petrov@mail.com" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
