@@ -35,6 +35,7 @@ export interface Station {
   freeUsers?: FreeUser[];
   history: HistoryEntry[];
   photos?: string[];
+  assignedUserId?: string; // ID назначенного сотрудника
 }
 
 export enum UserStatus {
@@ -51,8 +52,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  phone: string; // New field
-  password: string; // Should be hashed in a real app
+  phone: string;
+  password: string;
   status: UserStatus;
   role: UserRole;
 }
@@ -63,5 +64,6 @@ export interface AppNotification {
   timestamp: string;
   author: string;
   read: boolean;
-  type: 'info' | 'success' | 'warning' | 'danger';
+  type: 'info' | 'success' | 'warning' | 'danger' | 'push' | 'email' | 'assignment';
+  targetUserId?: string; // Для кого уведомление (null если для всех админов)
 }

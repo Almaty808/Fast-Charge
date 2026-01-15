@@ -14,7 +14,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
-    const [phone, setPhone] = useState(''); // New state
+    const [phone, setPhone] = useState('');
     const [error, setError] = useState('');
 
     const handleLoginSubmit = (e: React.FormEvent) => {
@@ -40,7 +40,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
             id: new Date().toISOString(),
             name,
             email,
-            phone, // Use phone from state
+            phone,
             password,
             status: UserStatus.PENDING,
             role: UserRole.USER,
@@ -56,102 +56,106 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 px-4">
-            <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-2xl dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-black text-primary-600 dark:text-primary-400 tracking-tight">
-                        ChargeManager
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-6 overflow-hidden relative">
+            {/* Background Decorations */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 rounded-full blur-[120px]" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+
+            <div className="w-full max-w-lg p-10 bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl dark:shadow-slate-950/50 border border-slate-100 dark:border-slate-800 relative z-10 animate-slide-up">
+                <div className="text-center mb-10">
+                    <div className="inline-flex p-4 rounded-3xl bg-primary-600 shadow-xl shadow-primary-500/30 mb-6">
+                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                        Fast Charge
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Система управления станциями</p>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium tracking-wide uppercase text-[11px]">Система управления активами</p>
                 </div>
                 
-                <h2 className="text-xl font-bold text-center text-slate-800 dark:text-slate-200">
-                    {isLoginView ? 'Вход в систему' : 'Создание аккаунта'}
-                </h2>
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl mb-8">
+                    <button 
+                        onClick={() => setIsLoginView(true)}
+                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${isLoginView ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                        Вход
+                    </button>
+                    <button 
+                        onClick={() => setIsLoginView(false)}
+                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${!isLoginView ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                        Регистрация
+                    </button>
+                </div>
                 
                 {error && (
-                    <div className="p-3 text-sm text-center text-red-800 bg-red-100 rounded-lg dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 animate-shake">
+                    <div className="mb-6 p-4 text-sm font-bold text-center text-red-600 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30 animate-shake">
                         {error}
                     </div>
                 )}
                 
-                <form onSubmit={isLoginView ? handleLoginSubmit : handleRegisterSubmit} className="space-y-4">
+                <form onSubmit={isLoginView ? handleLoginSubmit : handleRegisterSubmit} className="space-y-5">
                     {!isLoginView && (
-                        <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="name" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Имя сотрудника</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Имя</label>
                                 <input
-                                    id="name"
-                                    name="name"
                                     type="text"
                                     required
-                                    placeholder="Александр Иванов"
+                                    placeholder="Иван"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    className="mt-1 block w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                                    className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="phone" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Номер телефона</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Телефон</label>
                                 <input
-                                    id="phone"
-                                    name="phone"
                                     type="tel"
                                     required
-                                    placeholder="+7 (___) ___-__-__"
+                                    placeholder="+7..."
                                     value={phone}
                                     onChange={e => setPhone(e.target.value)}
-                                    className="mt-1 block w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                                    className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
                                 />
                             </div>
-                        </>
+                        </div>
                     )}
                     <div>
-                        <label htmlFor="email" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Email</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Email</label>
                         <input
-                            id="email"
-                            name="email"
                             type="email"
-                            autoComplete="email"
                             required
-                            placeholder="email@company.com"
+                            placeholder="mail@company.com"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            className="mt-1 block w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                            className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
                         />
                     </div>
                     <div>
-                        <label htmlFor="password"className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 ml-1">Пароль</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Пароль</label>
                         <input
-                            id="password"
-                            name="password"
                             type="password"
-                            autoComplete="current-password"
                             required
                             placeholder="••••••••"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="mt-1 block w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                            className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
                         />
                     </div>
-                    <div className="pt-2">
-                        <button
-                            type="submit"
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                            {isLoginView ? 'Войти в панель' : 'Зарегистрироваться'}
-                        </button>
-                    </div>
+                    
+                    <button
+                        type="submit"
+                        className="w-full py-5 px-6 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 shadow-xl shadow-primary-500/30 transition-all transform hover:scale-[1.02] active:scale-[0.98] mt-4"
+                    >
+                        {isLoginView ? 'Войти в панель' : 'Создать аккаунт'}
+                    </button>
                 </form>
 
-                <div className="text-sm text-center pt-2">
-                    <button
-                        onClick={() => { setIsLoginView(!isLoginView); setError(''); }}
-                        className="font-bold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-                    >
-                        {isLoginView ? 'Нет аккаунта? Зарегистрируйтесь' : 'Уже есть аккаунт? Войдите'}
-                    </button>
-                </div>
+                <p className="mt-8 text-center text-xs font-medium text-slate-400">
+                    © 2024 Fast Charge Enterprise Edition. Все права защищены.
+                </p>
             </div>
         </div>
     );

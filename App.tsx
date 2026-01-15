@@ -3,12 +3,12 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole, AppNotification } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-// Add missing MapPinIcon and CogIcon to the imports
-import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon, UsersIcon, LogoutIcon, BellIcon, PhoneIcon, WhatsAppIcon, MapPinIcon, CogIcon } from './components/Icons';
+import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon, UsersIcon, LogoutIcon, BellIcon, PhoneIcon, WhatsAppIcon, MapPinIcon, CogIcon, HistoryIcon, ChartPieIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
 import Auth from './components/Auth';
 import AdminPanel from './components/AdminPanel';
 import NotificationCenter from './components/NotificationCenter';
+import NetworkSummary from './components/NetworkSummary';
 
 const INITIAL_STATIONS: Station[] = [
   {
@@ -29,7 +29,8 @@ const INITIAL_STATIONS: Station[] = [
     ],
     history: [
       { id: 'h1', date: '2024-07-15T10:00:00Z', employee: 'Иван Петров', change: 'Станция создана' }
-    ]
+    ],
+    photos: []
   },
   {
     id: '2',
@@ -48,7 +49,8 @@ const INITIAL_STATIONS: Station[] = [
     ],
     history: [
         { id: 'h2', date: '2024-07-18T12:00:00Z', employee: 'Елена Сидорова', change: 'Станция создана' }
-    ]
+    ],
+    photos: []
   }
 ];
 
@@ -58,21 +60,6 @@ const generateHistoryEntry = (employee: string, change: string): HistoryEntry =>
   employee,
   change,
 });
-
-const diffStations = (oldS: Station, newS: Station): string[] => {
-    const changes: string[] = [];
-    const fields: { key: keyof Station; label: string }[] = [
-        { key: 'locationName', label: 'Название' }, { key: 'address', label: 'Адрес' },
-        { key: 'status', label: 'Статус' }, { key: 'notes', label: 'Заметки' },
-        { key: 'sid', label: 'SID' }, { key: 'did', label: 'DID' }, { key: 'sim', label: 'SIM' }
-    ];
-    fields.forEach(({ key, label }) => {
-        if ((oldS[key] || '') !== (newS[key] || '')) {
-            changes.push(`${label} изменено`);
-        }
-    });
-    return changes;
-};
 
 const App: React.FC = () => {
   const [stations, setStations] = useLocalStorage<Station[]>('stations', INITIAL_STATIONS);
@@ -88,52 +75,49 @@ const App: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('Все');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStations, setSelectedStations] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<'app' | 'admin'>('app');
+  const [view, setView] = useState<'app' | 'admin' | 'stats'>('app');
 
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const adminExists = users.some(u => u.role === UserRole.ADMIN);
-    if (!adminExists) {
-      const defaultAdmin: User = {
-        id: 'admin-' + Date.now(),
-        name: 'Главный Администратор',
-        email: 'almaty808@gmail.com',
-        phone: '+7 (777) 808-88-88',
-        password: '123qweasdzxc',
-        status: UserStatus.APPROVED,
-        role: UserRole.ADMIN,
-      };
-      setUsers([defaultAdmin, ...users]);
-    }
-  }, [users, setUsers]);
-
-  const addNotification = (message: string, type: AppNotification['type'] = 'info') => {
-      const newNotif: AppNotification = {
-          id: Math.random().toString(36).substr(2, 9),
-          message,
-          timestamp: new Date().toISOString(),
-          author: currentUser?.name || 'Система',
-          read: false,
-          type
-      };
-      setNotifications(prev => [newNotif, ...prev].slice(0, 100));
+  const createNotification = (message: string, type: AppNotification['type'] = 'info', targetUserId?: string) => {
+    const newNotif: AppNotification = {
+        id: Date.now().toString(),
+        message,
+        timestamp: new Date().toISOString(),
+        author: currentUser?.name || 'Система',
+        read: false,
+        type,
+        targetUserId
+    };
+    setNotifications(prev => [newNotif, ...prev]);
   };
 
   const handleSaveStation = (stationToSave: Station) => {
     const oldStation = stations.find(s => s.id === stationToSave.id);
     let newHistory: HistoryEntry[] = [...(stationToSave.history || [])];
 
+    // Smart Trigger 1: User installed a station -> Notify Admin
+    if (oldStation && oldStation.status !== StationStatus.INSTALLED && stationToSave.status === StationStatus.INSTALLED) {
+        createNotification(`Сотрудник ${currentUser?.name} завершил установку на объекте: ${stationToSave.locationName}`, 'success');
+        // Simulate email
+        console.log(`Email to Admin: Station ${stationToSave.locationName} is now active.`);
+    }
+
+    // Smart Trigger 2: Admin assigned installer -> Notify User
+    if (currentUser?.role === UserRole.ADMIN && stationToSave.assignedUserId && stationToSave.assignedUserId !== oldStation?.assignedUserId) {
+        const assignedUser = users.find(u => u.id === stationToSave.assignedUserId);
+        if (assignedUser) {
+            createNotification(`Вам назначена новая задача: установка станции в "${stationToSave.locationName}"`, 'assignment', assignedUser.id);
+            console.log(`Email to ${assignedUser.name}: New assignment received.`);
+        }
+    }
+
     if (oldStation) { 
-      const changes = diffStations(oldStation, stationToSave);
-      changes.forEach(change => newHistory.unshift(generateHistoryEntry(currentUser!.name, change)));
-      setStations(stations.map(s => s.id === stationToSave.id ? { ...stationToSave, history: newHistory } : s));
+      setStations(stations.map(s => s.id === stationToSave.id ? stationToSave : s));
     } else { 
       setInventoryCount(prev => prev - 1);
-      newHistory.unshift(generateHistoryEntry(currentUser!.name, "Станция создана"));
-      setStations([{ ...stationToSave, history: newHistory }, ...stations]);
+      setStations([stationToSave, ...stations]);
     }
     setIsFormOpen(false);
+    setEditingStation(null);
   };
 
   const handleLogout = () => { setCurrentUser(null); setView('app'); };
@@ -147,111 +131,200 @@ const App: React.FC = () => {
     return result;
   }, [stations, filterStatus, searchQuery]);
 
+  const handleToggleSelection = (id: string) => {
+    const next = new Set(selectedStations);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedStations(next);
+  };
+
+  // Only show relevant notifications for the user
+  const userNotifications = useMemo(() => {
+      return notifications.filter(n => !n.targetUserId || n.targetUserId === currentUser?.id || currentUser?.role === UserRole.ADMIN);
+  }, [notifications, currentUser]);
+
   if (!currentUser) return <Auth onLogin={setCurrentUser} users={users} setUsers={setUsers} />;
 
   const formatWhatsAppLink = (p: string) => `https://wa.me/${p.replace(/\D/g, '')}`;
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-      <header className="bg-white dark:bg-slate-800 shadow-md sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary-600 hidden sm:block">ChargeManager</h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-300 pb-20 md:pb-0">
+      
+      <header className="glass sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 shadow-sm pt-safe">
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-3">
+             <div className="bg-primary-600 p-1.5 md:p-2 rounded-xl shadow-lg shadow-primary-500/20">
+                <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+             </div>
+             <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white tracking-tighter cursor-pointer" onClick={() => setView('app')}>Fast Charge</h1>
+          </div>
+
           <div className="flex items-center gap-2">
-            <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 p-2 rounded-lg flex items-center gap-2">
-                <PackageIcon className="w-4 h-4 text-primary-500" />
-                <span>Склад: {inventoryCount}</span>
-            </div>
-            
-            <button onClick={() => setIsTeamOpen(true)} className="p-2 text-slate-500 hover:text-primary-600 transition-colors" title="Команда">
-                <UsersIcon className="w-6 h-6" />
+            <button onClick={() => setView('stats')} className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === 'stats' ? 'bg-primary-100 text-primary-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                <ChartPieIcon className="w-4 h-4" />
+                Сеть
             </button>
 
-            <div className="relative">
-                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-2 text-slate-500 hover:text-primary-600 transition-colors relative">
-                    <BellIcon className="w-6 h-6" />
-                    {notifications.some(n => !n.read) && <span className="absolute top-1.5 right-1.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-700">
+                <div className="relative">
+                    <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-2 text-slate-500 hover:text-primary-600 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all relative">
+                        <BellIcon className="w-5 h-5" />
+                        {userNotifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-800" />}
+                    </button>
+                    {isNotifOpen && <NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} />}
+                </div>
+
+                <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-all">
+                    <LogoutIcon className="w-5 h-5" />
                 </button>
-                {isNotifOpen && <NotificationCenter notifications={notifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} />}
             </div>
-
-            {currentUser.role === UserRole.ADMIN && (
-                <button onClick={() => setView(view === 'admin' ? 'app' : 'admin')} className="p-2 text-primary-600 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                    {view === 'admin' ? <MapPinIcon className="w-6 h-6" /> : <CogIcon className="w-6 h-6" />}
-                </button>
-            )}
-
-            <button onClick={handleLogout} className="p-2 text-red-500"><LogoutIcon className="w-6 h-6" /></button>
             
-            <button onClick={() => setIsFormOpen(true)} className="p-2 bg-primary-600 text-white rounded-lg"><PlusIcon className="w-6 h-6" /></button>
+            <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/30 transition-all active:scale-95">
+                <PlusIcon className="w-5 h-5" />
+                <span>Добавить</span>
+            </button>
           </div>
         </div>
       </header>
 
-      {view === 'admin' && currentUser.role === UserRole.ADMIN ? (
-        <AdminPanel 
-            users={users} setUsers={setUsers} stations={stations} setStations={setStations}
-            inventoryCount={inventoryCount} setInventoryCount={setInventoryCount} notifications={notifications}
-            onEditStation={(s) => { setEditingStation(s); setIsFormOpen(true); }}
-            onDeleteStation={(id) => setStations(stations.filter(s => s.id !== id))}
-            onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))}
-            onAddStation={() => { setEditingStation(null); setIsFormOpen(true); }}
-            onBack={() => setView('app')}
-        />
-      ) : (
-        <main className="container mx-auto px-4 py-8">
-            <div className="mb-6 flex gap-4">
-                <input type="text" placeholder="Поиск станций..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700" />
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700">
-                    <option value="Все">Все статусы</option>
-                    {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-            </div>
-            <StationList stations={displayedStations} selectedStations={selectedStations} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={() => {}} onStatusChange={() => {}} onToggleSelection={() => {}} />
-        </main>
-      )}
-
-      {/* Team Modal */}
-      {isTeamOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
-                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-primary-600 text-white">
-                      <div>
-                        <h2 className="text-xl font-bold">Наша Команда</h2>
-                        <p className="text-xs opacity-80">Список всех активных сотрудников</p>
-                      </div>
-                      <button onClick={() => setIsTeamOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">✕</button>
+      <div className="max-w-7xl mx-auto min-h-[calc(100vh-140px)]">
+        {view === 'admin' && currentUser.role === UserRole.ADMIN ? (
+          <AdminPanel 
+              users={users} setUsers={setUsers} stations={stations} setStations={setStations}
+              inventoryCount={inventoryCount} setInventoryCount={setInventoryCount} notifications={notifications}
+              onEditStation={(s) => { setEditingStation(s); setIsFormOpen(true); }}
+              onDeleteStation={(id) => setStations(stations.filter(s => s.id !== id))}
+              onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))}
+              onAddStation={() => { setEditingStation(null); setIsFormOpen(true); }}
+              onBack={() => setView('app')}
+              onSendMessage={(msg, type, userId) => createNotification(msg, type, userId)}
+          />
+        ) : view === 'stats' ? (
+          <main className="container mx-auto px-4 md:px-6 py-6 md:py-10">
+              <NetworkSummary stations={stations} />
+          </main>
+        ) : (
+          <main className="container mx-auto px-4 md:px-6 py-6 md:py-10 animate-slide-up">
+              <div className="mb-6 md:mb-10 flex flex-col md:flex-row gap-3 md:gap-4">
+                  <div className="relative flex-1">
+                      <SearchIcon className="absolute left-4 top-3 h-5 w-5 text-slate-400 md:top-3.5" />
+                      <input 
+                          type="text" 
+                          placeholder="Поиск..." 
+                          value={searchQuery} 
+                          onChange={e => setSearchQuery(e.target.value)} 
+                          className="w-full pl-12 pr-6 py-3 md:py-3.5 rounded-2xl bg-white dark:bg-slate-900 border-none shadow-sm focus:ring-4 focus:ring-primary-500/20 transition-all text-slate-900 dark:text-white font-medium text-sm md:text-base" 
+                      />
                   </div>
-                  <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+                  <div className="flex gap-2">
+                      <select 
+                          value={filterStatus} 
+                          onChange={e => setFilterStatus(e.target.value)} 
+                          className="flex-1 md:flex-none px-4 md:px-6 py-3 md:py-3.5 rounded-2xl bg-white dark:bg-slate-900 border-none shadow-sm focus:ring-4 focus:ring-primary-500/20 transition-all font-bold text-xs md:text-sm text-slate-700 dark:text-slate-200 cursor-pointer"
+                      >
+                          <option value="Все">Все статусы</option>
+                          {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                  </div>
+              </div>
+
+              <StationList 
+                  stations={displayedStations} 
+                  selectedStations={selectedStations} 
+                  onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} 
+                  onDelete={(id) => setStations(stations.filter(s => s.id !== id))} 
+                  onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} 
+                  onToggleSelection={handleToggleSelection} 
+              />
+          </main>
+        )}
+      </div>
+
+      <nav className="md:hidden glass fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 dark:border-slate-800 pb-safe">
+          <div className="flex justify-around items-center h-16">
+              <button 
+                onClick={() => { setView('app'); setIsTeamOpen(false); }}
+                className={`flex flex-col items-center gap-1 transition-all ${view === 'app' && !isTeamOpen ? 'text-primary-600' : 'text-slate-400'}`}
+              >
+                  <MapPinIcon className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Карта</span>
+              </button>
+              
+              <button 
+                onClick={() => { setView('stats'); setIsTeamOpen(false); }}
+                className={`flex flex-col items-center gap-1 transition-all ${view === 'stats' && !isTeamOpen ? 'text-primary-600' : 'text-slate-400'}`}
+              >
+                  <ChartPieIcon className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Сеть</span>
+              </button>
+
+              <div className="relative -top-4">
+                  <button 
+                    onClick={() => { setEditingStation(null); setIsFormOpen(true); }}
+                    className="h-14 w-14 bg-primary-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-primary-500/40 active:scale-90 transition-transform"
+                  >
+                      <PlusIcon className="w-8 h-8" />
+                  </button>
+              </div>
+
+              <button 
+                onClick={() => { setIsTeamOpen(true); }}
+                className={`flex flex-col items-center gap-1 transition-all ${isTeamOpen ? 'text-primary-600' : 'text-slate-400'}`}
+              >
+                  <UsersIcon className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Команда</span>
+              </button>
+
+              {currentUser.role === UserRole.ADMIN && (
+                <button 
+                    onClick={() => { setView(view === 'admin' ? 'app' : 'admin'); setIsTeamOpen(false); }}
+                    className={`flex flex-col items-center gap-1 transition-all ${view === 'admin' ? 'text-primary-600' : 'text-slate-400'}`}
+                >
+                    <CogIcon className="w-6 h-6" />
+                    <span className="text-[10px] font-bold">Админ</span>
+                </button>
+              )}
+          </div>
+      </nav>
+
+      {isTeamOpen && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-end md:items-center justify-center p-0 md:p-6">
+              <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-t-4xl md:rounded-[2.5rem] shadow-2xl overflow-hidden animate-mobile-form md:animate-slide-up border border-slate-100 dark:border-slate-800 h-[90vh] md:h-auto flex flex-col">
+                  <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+                      <div>
+                        <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Команда проекта</h2>
+                        <p className="text-xs md:text-sm text-slate-500 font-medium">Активные участники</p>
+                      </div>
+                      <button onClick={() => setIsTeamOpen(false)} className="p-2 md:p-3 bg-slate-100 dark:bg-slate-800 rounded-full">✕</button>
+                  </div>
+                  <div className="p-4 md:p-8 overflow-y-auto space-y-3 md:space-y-4 scrollbar-hide flex-1">
                       {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
-                          <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-600 gap-4">
-                              <div className="flex items-center gap-4">
-                                  <div className="h-12 w-12 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-lg">
+                          <div key={user.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-800">
+                              <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                                  <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg md:text-xl shrink-0 shadow-lg">
                                       {user.name.charAt(0)}
                                   </div>
-                                  <div>
-                                      <h4 className="font-bold text-slate-900 dark:text-slate-100">{user.name}</h4>
-                                      <p className="text-xs text-slate-500">{user.role}</p>
+                                  <div className="min-w-0">
+                                      <h4 className="font-bold text-slate-900 dark:text-white truncate">{user.name}</h4>
+                                      <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-300">
+                                        {user.role}
+                                      </span>
                                   </div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                  <div className="text-right hidden sm:block">
-                                      <p className="text-sm font-bold">{user.phone}</p>
-                                      <p className="text-[10px] text-slate-400">{user.email}</p>
-                                  </div>
-                                  <div className="flex gap-2">
-                                      <a href={`tel:${user.phone}`} className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-primary-600 border border-slate-200 dark:border-slate-600">
-                                          <PhoneIcon className="w-5 h-5" />
-                                      </a>
-                                      <a href={formatWhatsAppLink(user.phone)} target="_blank" rel="noopener noreferrer" className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-green-500 border border-slate-200 dark:border-slate-600">
-                                          <WhatsAppIcon className="w-5 h-5" />
-                                      </a>
-                                  </div>
+                              <div className="flex gap-2 shrink-0">
+                                  <a href={`tel:${user.phone}`} className="p-2.5 bg-white dark:bg-slate-700 rounded-xl shadow-sm text-primary-600 border border-slate-200 dark:border-slate-600 active:scale-90 transition-transform">
+                                      <PhoneIcon className="w-5 h-5" />
+                                  </a>
+                                  <a href={formatWhatsAppLink(user.phone)} target="_blank" rel="noopener noreferrer" className="p-2.5 bg-white dark:bg-slate-700 rounded-xl shadow-sm text-green-500 border border-slate-200 dark:border-slate-600 active:scale-90 transition-transform">
+                                      <WhatsAppIcon className="w-5 h-5" />
+                                  </a>
                               </div>
                           </div>
                       ))}
                   </div>
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 text-center">
-                      <button onClick={() => setIsTeamOpen(false)} className="text-sm font-bold text-slate-500 hover:text-slate-800">Закрыть</button>
+                  <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-center shrink-0 md:hidden pb-safe">
+                      <button onClick={() => setIsTeamOpen(false)} className="w-full py-4 text-sm font-bold text-slate-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 transition-colors">Закрыть</button>
                   </div>
               </div>
           </div>
@@ -262,7 +335,9 @@ const App: React.FC = () => {
           station={editingStation}
           currentUserName={currentUser.name}
           onSave={handleSaveStation}
-          onClose={() => setIsFormOpen(false)}
+          onClose={() => { setIsFormOpen(false); setEditingStation(null); }}
+          allUsers={users.filter(u => u.status === UserStatus.APPROVED)}
+          isAdmin={currentUser.role === UserRole.ADMIN}
         />
       )}
     </div>

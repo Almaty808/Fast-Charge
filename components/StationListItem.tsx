@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Station, StationStatus } from '../types';
 import StatusBadge from './StatusBadge';
-import { EditIcon, TrashIcon, MapPinIcon, WhatsAppIcon, HistoryIcon, ChevronDownIcon } from './Icons';
+import { EditIcon, TrashIcon, MapPinIcon, WhatsAppIcon, HistoryIcon, ChevronDownIcon, PackageIcon } from './Icons';
 
 interface StationListItemProps {
   station: Station;
@@ -22,134 +22,144 @@ const StationListItem: React.FC<StationListItemProps> = ({ station, isSelected, 
   };
 
   return (
-    <div className={`relative bg-white dark:bg-slate-800 rounded-lg shadow-md p-5 border flex flex-col justify-between transition-all duration-200 ${isSelected ? 'border-primary-500 ring-2 ring-primary-500/50' : 'border-slate-200 dark:border-slate-700'}`}>
-      <div className="absolute top-4 left-4 z-10">
+    <div className={`group relative bg-white dark:bg-slate-800 rounded-3xl shadow-sm hover:shadow-xl border-2 transition-all duration-300 overflow-hidden ${isSelected ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-slate-100 dark:border-slate-700'}`}>
+      
+      {/* Selection Checkbox Overlay */}
+      <div className="absolute top-4 left-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
           <input
               type="checkbox"
               checked={isSelected}
               onChange={() => onToggleSelection(station.id)}
-              className="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+              className="h-6 w-6 rounded-full border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer shadow-sm"
               onClick={(e) => e.stopPropagation()}
           />
       </div>
-      
-      <div>
-        <div className="flex justify-between items-start mb-2 pl-8">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{station.locationName}</h3>
+
+      {/* Main Content Area */}
+      <div className="p-6">
+        <div className="flex justify-between items-start gap-4 mb-4">
+          <div className="flex-1">
+            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white leading-tight mb-1 group-hover:text-primary-600 transition-colors">
+              {station.locationName}
+            </h3>
+            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+              <MapPinIcon className="w-4 h-4 shrink-0" />
+              <p className="text-sm font-medium truncate">{station.address}</p>
+            </div>
+          </div>
           <StatusBadge status={station.status} />
         </div>
-        <div className="flex items-center gap-2 mb-4 pl-8">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{station.address}</p>
-          {station.coordinates && (
-            <a
-              href={`https://www.openstreetmap.org/?mlat=${station.coordinates.lat}&mlon=${station.coordinates.lng}#map=18/${station.coordinates.lat}/${station.coordinates.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Показать на карте"
-              className="text-primary-500 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-            >
-              <MapPinIcon className="w-5 h-5" />
-            </a>
-          )}
-        </div>
 
+        {/* Photos Grid */}
         {station.photos && station.photos.length > 0 && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="grid grid-cols-3 gap-2 mb-6 h-28">
             {station.photos.map((photo, index) => (
-              <img 
-                key={index} 
-                src={photo} 
-                alt={`Station view ${index + 1}`} 
-                className="h-24 w-24 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 shadow-sm"
-              />
+              <div key={index} className="relative group/photo overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                <img 
+                  src={photo} 
+                  alt={`View ${index + 1}`} 
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover/photo:scale-110"
+                />
+              </div>
             ))}
           </div>
         )}
 
-        <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 mb-4 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
-          <p><strong>Установщик:</strong> {station.installer}</p>
-          <p><strong>Дата:</strong> {new Date(station.installationDate).toLocaleDateString('ru-RU')}</p>
-          {station.sid && <p><strong>SID:</strong> {station.sid}</p>}
-          {station.did && <p><strong>DID:</strong> {station.did}</p>}
-          {station.sim && <p><strong>SIM:</strong> {station.sim}</p>}
+        {/* Quick Info Tags */}
+        <div className="flex flex-wrap gap-2 mb-6">
+            {station.sid && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-700/50 rounded-full text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                <span className="opacity-50 text-[10px]">SID:</span> {station.sid}
+              </div>
+            )}
+            {station.did && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-700/50 rounded-full text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                <span className="opacity-50 text-[10px]">DID:</span> {station.did}
+              </div>
+            )}
         </div>
 
+        {/* Free Users List */}
         {station.freeUsers && station.freeUsers.length > 0 && (
-          <div className="mb-4">
-            <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-2">Бесплатные пользователи:</h4>
-            <ul className="space-y-3">
-              {station.freeUsers.map(user => (
-                <li key={user.id} className="text-xs bg-slate-50 dark:bg-slate-700/50 p-2 rounded-md">
-                  <p className="font-medium text-slate-800 dark:text-slate-200">{user.fullName}</p>
-                  {user.position && <p className="text-slate-500 dark:text-slate-400">{user.position}</p>}
+          <div className="space-y-3 mb-6">
+              {station.freeUsers.slice(0, 2).map(user => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-primary-50/50 dark:bg-primary-900/10 rounded-2xl border border-primary-100/50 dark:border-primary-900/20">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{user.fullName}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{user.position || 'Персонал'}</p>
+                  </div>
                   {user.phone && (
                     <a
                       href={formatWhatsAppLink(user.phone)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 transition-colors group mt-1"
+                      className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm text-green-500 hover:scale-110 transition-transform active:scale-95"
                     >
-                      <WhatsAppIcon className="w-3.5 h-3.5 text-green-500 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors" />
-                      <span>{user.phone}</span>
+                      <WhatsAppIcon className="w-4 h-4" />
                     </a>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
           </div>
         )}
 
+        {/* Station Notes Snippet */}
         {station.notes && (
-          <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md">
-            <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{station.notes}</p>
+          <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-700/30 rounded-2xl border-l-4 border-primary-500 italic">
+            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">"{station.notes}"</p>
           </div>
         )}
-        
+
+        {/* History Toggle */}
         {station.history && station.history.length > 0 && (
-            <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+            <div className="mb-2">
                 <button
                     onClick={() => setIsHistoryVisible(!isHistoryVisible)}
-                    className="w-full flex justify-between items-center text-left text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+                    className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-primary-500 transition-colors py-1 uppercase tracking-widest"
                 >
-                    <div className="flex items-center gap-2">
-                        <HistoryIcon className="w-4 h-4" />
-                        <span>История изменений ({station.history.length})</span>
-                    </div>
-                    <ChevronDownIcon className={`w-5 h-5 transition-transform ${isHistoryVisible ? 'rotate-180' : ''}`} />
+                    <HistoryIcon className="w-4 h-4" />
+                    <span>Логи ({station.history.length})</span>
+                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-300 ${isHistoryVisible ? 'rotate-180' : ''}`} />
                 </button>
                 {isHistoryVisible && (
-                    <div className="mt-3 pl-2 border-l-2 border-slate-200 dark:border-slate-600 space-y-3 max-h-48 overflow-y-auto pr-2">
-                        {station.history.map(entry => (
-                            <div key={entry.id} className="text-xs">
-                                <p className="font-semibold text-slate-700 dark:text-slate-200">{entry.change}</p>
-                                <p className="text-slate-500 dark:text-slate-400">
-                                    {new Date(entry.date).toLocaleString('ru-RU')} - {entry.employee}
-                                </p>
+                    <div className="mt-3 space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-700 animate-slide-up">
+                        {station.history.slice(0, 3).map(entry => (
+                            <div key={entry.id} className="text-[10px]">
+                                <p className="font-bold text-slate-700 dark:text-slate-200">{entry.change}</p>
+                                <p className="text-slate-400">{entry.employee} • {new Date(entry.date).toLocaleDateString()}</p>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
         )}
-
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-        <div className="w-full sm:w-auto mb-2 sm:mb-0">
+      {/* Footer Controls */}
+      <div className="px-6 py-4 bg-slate-50 dark:bg-slate-700/20 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+        <div className="flex-1">
           <select 
             value={station.status} 
             onChange={(e) => onStatusChange(station.id, e.target.value as StationStatus)}
-            className="w-full text-sm rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200"
+            className="w-full text-xs font-bold rounded-xl border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 focus:ring-primary-500 transition-all cursor-pointer shadow-sm"
             disabled={station.status === StationStatus.REMOVED}
           >
             {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => onEdit(station)} className="p-2 text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors"  disabled={station.status === StationStatus.REMOVED}>
+        <div className="flex gap-1">
+          <button 
+            onClick={() => onEdit(station)} 
+            className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-all active:scale-90"
+            disabled={station.status === StationStatus.REMOVED}
+          >
             <EditIcon className="w-5 h-5" />
           </button>
-          <button onClick={() => onDelete(station.id)} className="p-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-500 transition-colors" disabled={station.status === StationStatus.REMOVED}>
+          <button 
+            onClick={() => onDelete(station.id)} 
+            className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all active:scale-90"
+            disabled={station.status === StationStatus.REMOVED}
+          >
             <TrashIcon className="w-5 h-5" />
           </button>
         </div>
