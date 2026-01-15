@@ -35,7 +35,7 @@ export interface Station {
   freeUsers?: FreeUser[];
   history: HistoryEntry[];
   photos?: string[];
-  assignedUserId?: string; // ID назначенного сотрудника
+  assignedUserId?: string; 
 }
 
 export enum UserStatus {
@@ -67,13 +67,14 @@ export interface UserGroup {
 
 export interface User {
   id: string;
+  loginId: string; // Уникальный ID для входа (например FC-001)
   name: string;
   email: string;
   phone: string;
   password: string;
   status: UserStatus;
   role: UserRole;
-  groupId?: string; // Привязка к группе
+  groupId?: string; 
 }
 
 export interface AppNotification {
@@ -83,7 +84,7 @@ export interface AppNotification {
   author: string;
   read: boolean;
   type: 'info' | 'success' | 'warning' | 'danger' | 'push' | 'email' | 'assignment';
-  targetUserId?: string; // Для кого уведомление (null если для всех админов)
+  targetUserId?: string; 
 }
 
 export interface InventoryItem {

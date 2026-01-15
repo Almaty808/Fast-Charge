@@ -60,38 +60,25 @@ const App: React.FC = () => {
   const pendingUsersCount = pendingUsers.length;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-  // Cleanup effect: Удаление указанного пользователя и инициализация админа
   useEffect(() => {
-    const targetEmail = 'alimzantaziev@gmail.com';
-    const masterEmail = 'almaty808@gmail.com';
-    
-    let updatedUsers = [...users];
-    let changed = false;
+    const masterLogin = 'admin-808';
+    const foundMaster = users.find(u => u.loginId === masterLogin);
 
-    // 1. Удаляем целевой email
-    if (updatedUsers.some(u => u.email.toLowerCase().trim() === targetEmail)) {
-        updatedUsers = updatedUsers.filter(u => u.email.toLowerCase().trim() !== targetEmail);
-        changed = true;
-    }
-
-    // 2. Гарантируем наличие главного админа
-    if (!updatedUsers.find(u => u.email === masterEmail)) {
+    if (!foundMaster) {
       const master: User = {
         id: 'master-001',
+        loginId: masterLogin,
         name: 'Главный Администратор',
-        email: masterEmail,
+        email: 'almaty808@gmail.com',
         phone: '+7 777 808 8888',
         password: '1qazaq1',
         status: UserStatus.APPROVED,
         role: UserRole.ADMIN,
         groupId: 'g-admin'
       };
-      updatedUsers = [master, ...updatedUsers];
-      changed = true;
-    }
-
-    if (changed) {
-        setUsers(updatedUsers);
+      setUsers(prev => [master, ...prev]);
+    } else if (foundMaster.status !== UserStatus.APPROVED) {
+      setUsers(prev => prev.map(u => u.loginId === masterLogin ? { ...u, status: UserStatus.APPROVED } : u));
     }
   }, [users, setUsers]);
 
@@ -163,7 +150,7 @@ const App: React.FC = () => {
   }, [notifications, currentUser, isAdmin]);
 
   const navItems: NavItem[] = [
-    { id: 'app', label: 'Объекты', icon: MapPinIcon },
+    { id: 'app', label: 'Сеть', icon: MapPinIcon },
     { id: 'stats', label: 'Аналитика', icon: ChartPieIcon },
     { id: 'team', label: 'Команда', icon: UsersIcon, badge: isAdmin && pendingUsersCount > 0 },
     ...(isAdmin ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon, badge: pendingUsersCount > 0 }] : [])
@@ -192,22 +179,17 @@ const App: React.FC = () => {
 
       case 'stats':
         return (
-          <main className="container mx-auto px-4 lg:px-12 py-12">
+          <main className="container mx-auto px-4 lg:px-12 py-12 pb-32">
             <NetworkSummary stations={stations} allUsers={users} isAdmin={isAdmin} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} />
           </main>
         );
 
       case 'team':
         return (
-          <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-              <div className="mb-12 flex items-center gap-4">
-                  <div className="w-14 h-14 bg-primary-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl">
-                      <UsersIcon className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Команда Fast Charge</h2>
-                    <p className="text-slate-400 font-bold mt-2">Реестр сотрудников и управление доступом</p>
-                  </div>
+          <main className="container mx-auto px-6 lg:px-12 py-10 pb-32 animate-slide-up">
+              <div className="mb-10 flex flex-col gap-2">
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Команда</h2>
+                  <p className="text-slate-400 font-bold text-sm">Управление доступом и ролями</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -216,36 +198,32 @@ const App: React.FC = () => {
                       if (isPending && !isAdmin) return null;
 
                       return (
-                        <div key={user.id} className={`flex flex-col p-8 bg-white dark:bg-slate-900 rounded-[3rem] border-2 shadow-sm transition-all ${isPending ? 'border-rose-500 shadow-rose-500/10' : 'border-slate-100 dark:border-slate-800'}`}>
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className={`h-16 w-16 rounded-[1.25rem] flex items-center justify-center text-white font-black text-2xl ${isPending ? 'bg-rose-500 animate-pulse' : 'bg-gradient-to-br from-primary-500 to-indigo-700'}`}>
-                                        {user.name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none mb-2 truncate">{user.name}</h4>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${isPending ? 'bg-rose-50 text-rose-600' : 'bg-primary-50 text-primary-600 dark:bg-primary-900/20'}`}>
-                                                {isPending ? 'Ожидает доступа' : user.role}
-                                            </span>
-                                        </div>
+                        <div key={user.id} className={`flex flex-col p-6 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 shadow-sm transition-all ${isPending ? 'border-rose-500 shadow-rose-500/10' : 'border-slate-100 dark:border-slate-800'}`}>
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-white font-black text-xl shrink-0 ${isPending ? 'bg-rose-500 animate-pulse' : 'bg-gradient-to-br from-primary-500 to-indigo-700'}`}>
+                                    {user.name.charAt(0)}
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{user.name}</h4>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                      <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">ID: {user.loginId}</span>
+                                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border w-fit ${isPending ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 border-primary-100 dark:border-primary-800'}`}>
+                                          {isPending ? 'Ожидает' : user.role}
+                                      </span>
                                     </div>
                                 </div>
-                                {!isPending && (
-                                    <a href={`tel:${user.phone}`} className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 dark:border-slate-700 shadow-sm hover:bg-primary-600 hover:text-white transition-all"><PhoneIcon className="w-5 h-5" /></a>
-                                )}
                             </div>
-                            <div className="space-y-2 mb-6">
-                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2"><EnvelopeIcon className="w-3.5 h-3.5" /> {user.email}</p>
-                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2"><PhoneIcon className="w-3.5 h-3.5" /> {user.phone}</p>
+                            <div className="space-y-3 mb-6">
+                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2 truncate"><EnvelopeIcon className="w-4 h-4" /> {user.email}</p>
+                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2 truncate"><PhoneIcon className="w-4 h-4" /> {user.phone}</p>
                             </div>
                             
                             {isPending && isAdmin && (
                                 <button 
                                     onClick={() => handleApproveFromTeam(user.id)}
-                                    className="w-full py-4 bg-rose-600 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-4 bg-rose-600 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <CheckIcon className="w-4 h-4" /> Подтвердить регистрацию
+                                    <CheckIcon className="w-4 h-4" /> Подтвердить
                                 </button>
                             )}
                         </div>
@@ -258,17 +236,15 @@ const App: React.FC = () => {
       case 'app':
       default:
         return (
-          <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-              <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                  <div>
-                    <h2 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2>
-                    <p className="text-slate-400 font-bold mt-2">Управление и мониторинг активных станций</p>
-                  </div>
-                  <div className="flex gap-4">
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-6 py-4 rounded-[1.5rem] bg-white dark:bg-slate-900 border-none shadow-sm font-black text-[11px] uppercase tracking-wider text-slate-600 cursor-pointer appearance-none border border-slate-100 dark:border-slate-800">
-                      <option value="Все">Все статусы</option>
-                      {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+          <main className="container mx-auto px-6 lg:px-12 py-10 pb-32 animate-slide-up">
+              <div className="mb-8 flex flex-col gap-2">
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">Объекты</h2>
+                  <div className="flex items-center justify-between gap-4">
+                      <p className="text-slate-400 font-bold text-sm">Активная сеть станций</p>
+                      <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-3 py-1.5 rounded-xl shadow-sm outline-none">
+                        <option value="Все">Все</option>
+                        {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
                   </div>
               </div>
               <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
@@ -282,20 +258,20 @@ const App: React.FC = () => {
   if (currentUser.status === UserStatus.PENDING) {
       return (
           <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3.5rem] p-12 shadow-2xl border border-slate-100 dark:border-slate-800 animate-scale-in">
-                  <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-[2.5rem] flex items-center justify-center text-amber-500 mx-auto mb-8 shadow-inner">
-                      <ClockIcon className="w-12 h-12 animate-pulse" />
+              <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-2xl border border-slate-100 dark:border-slate-800 animate-scale-in">
+                  <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center text-amber-500 mx-auto mb-8">
+                      <ClockIcon className="w-10 h-10 animate-pulse" />
                   </div>
-                  <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-4">Доступ ограничен</h1>
-                  <p className="text-slate-500 font-medium leading-relaxed mb-10">Ваш аккаунт <b>{currentUser.name}</b> ожидает подтверждения администратором.</p>
-                  <button onClick={() => setCurrentUser(null)} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-3xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-xl">Вернуться к логину</button>
+                  <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-4">Ожидайте...</h1>
+                  <p className="text-slate-500 font-medium leading-relaxed mb-8">Ваш аккаунт <b>{currentUser.name}</b> на проверке у администратора.</p>
+                  <button onClick={() => setCurrentUser(null)} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95">Назад</button>
               </div>
           </div>
       );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors duration-500">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors duration-500 selection:bg-primary-100 selection:text-primary-700">
       <aside className="hidden lg:flex flex-col w-72 bg-white dark:bg-slate-900 border-r border-slate-200/50 dark:border-slate-800/50 h-screen sticky top-0 z-40">
         <div className="p-8 pb-10 flex items-center gap-4">
            <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary-500/30">
@@ -317,31 +293,34 @@ const App: React.FC = () => {
         <div className="p-6 border-t border-slate-100 dark:border-slate-800">
            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center font-black">{currentUser.name.charAt(0)}</div>
-              <div className="flex-1 min-w-0"><p className="text-xs font-black text-slate-900 dark:text-white truncate">{currentUser.name}</p></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-slate-900 dark:text-white truncate">{currentUser.name}</p>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{currentUser.loginId}</p>
+              </div>
               <button onClick={() => setCurrentUser(null)} className="text-slate-400 hover:text-rose-500"><LogoutIcon className="w-5 h-5" /></button>
            </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="glass sticky top-0 z-30 border-b border-slate-200/50 dark:border-slate-800/50 h-16 md:h-24 shrink-0 pt-safe flex items-center px-4 lg:px-10 justify-between">
-            <div className="flex-1 max-w-2xl">
+        <header className="glass sticky top-0 z-[60] border-b border-slate-200/50 dark:border-slate-800/50 h-16 md:h-24 shrink-0 pt-safe flex items-center px-6 md:px-10 justify-between">
+            <div className="flex-1 max-w-xl">
                 <div className="relative">
-                    <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input type="text" placeholder="Поиск объектов..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-16 pr-8 py-3 md:py-5 bg-slate-100 dark:bg-slate-800/50 border-none rounded-[2rem] text-sm font-bold focus:ring-4 focus:ring-primary-500/10 transition-all text-slate-900 dark:text-white" />
+                    <SearchIcon className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" />
+                    <input type="text" placeholder="Поиск объектов..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 md:pl-16 pr-6 py-2 md:py-4 bg-slate-100/50 dark:bg-slate-800/30 border-none rounded-2xl md:rounded-[2rem] text-sm font-bold focus:ring-4 focus:ring-primary-500/10 transition-all text-slate-900 dark:text-white" />
                 </div>
             </div>
-            <div className="flex items-center gap-4 ml-4">
+            <div className="flex items-center gap-3 md:gap-4 ml-4">
               <div className="relative">
-                  <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500 ${pendingUsersCount > 0 ? 'ring-4 ring-rose-500/20' : ''}`}>
-                      <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${pendingUsersCount > 0 ? 'text-rose-500' : ''}`} />
+                  <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500`}>
+                      <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${pendingUsersCount > 0 ? 'text-rose-500 animate-pulse' : ''}`} />
                       {(userNotifications.some(n => !n.read) || (isAdmin && pendingUsersCount > 0)) && (
-                        <span className={`absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 ${pendingUsersCount > 0 ? 'animate-ping' : ''}`} />
+                        <span className="absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
                       )}
                   </button>
-                  {isNotifOpen && <div className="absolute right-0 mt-4 origin-top-right"><NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} /></div>}
+                  {isNotifOpen && <div className="absolute right-0 mt-2 origin-top-right z-[100]"><NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} /></div>}
               </div>
-              <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="hidden lg:flex px-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Новый объект</button>
+              <button onClick={() => setCurrentUser(null)} className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-500"><LogoutIcon className="w-5 h-5"/></button>
             </div>
         </header>
 
@@ -350,7 +329,31 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="fixed z-50 right-10 bottom-10 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all"><PlusIcon className="w-8 h-8" /></button>
+      {view === 'app' && (
+        <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="lg:hidden fixed z-40 right-6 bottom-24 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all border-4 border-white dark:border-slate-950">
+          <PlusIcon className="w-8 h-8" />
+        </button>
+      )}
+
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-[70] px-6 pb-safe">
+          <div className="h-full flex items-center justify-between max-w-md mx-auto">
+              {navItems.map((item) => (
+                  <button 
+                    key={item.id} 
+                    onClick={() => setView(item.id)}
+                    className={`flex flex-col items-center justify-center gap-1.5 transition-all relative ${view === item.id ? 'text-primary-600' : 'text-slate-400'}`}
+                  >
+                      <div className={`p-2 rounded-xl transition-all ${view === item.id ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}>
+                          <item.icon className="w-6 h-6" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                      {item.badge && (
+                          <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                      )}
+                  </button>
+              ))}
+          </div>
+      </nav>
 
       {isFormOpen && (
         <StationForm station={editingStation} currentUserName={currentUser.name} onSave={handleSaveStation} onClose={() => { setIsFormOpen(false); setEditingStation(null); }} allUsers={users.filter(u => u.status === UserStatus.APPROVED)} isAdmin={isAdmin} />

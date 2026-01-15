@@ -4,16 +4,29 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Fast Charge | Smart Network</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       
+      :root {
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
+      }
+
       body {
         font-family: 'Plus Jakarta Sans', sans-serif;
         -webkit-tap-highlight-color: transparent;
         scroll-behavior: smooth;
+        overscroll-behavior-y: contain;
+      }
+
+      /* Prevent iOS font zoom on input focus */
+      input, select, textarea {
+        font-size: 16px !important;
       }
 
       .glass {
@@ -58,10 +71,20 @@
       }
 
       .pb-safe {
-        padding-bottom: env(safe-area-inset-bottom);
+        padding-bottom: var(--safe-bottom);
       }
       .pt-safe {
-        padding-top: env(safe-area-inset-top);
+        padding-top: var(--safe-top);
+      }
+      
+      /* Mobile optimization for buttons and cards */
+      @media (max-width: 640px) {
+        .card-container {
+            padding: 1rem;
+        }
+        button:active {
+            transform: scale(0.96);
+        }
       }
     </style>
     <script>
