@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole, AppNotification, UserGroup, AppPermission } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-import { PlusIcon, SearchIcon, UsersIcon, LogoutIcon, BellIcon, MapPinIcon, CogIcon, ChartPieIcon, PhoneIcon, WhatsAppIcon, ChevronDownIcon, ClockIcon } from './components/Icons';
+import { PlusIcon, SearchIcon, UsersIcon, LogoutIcon, BellIcon, MapPinIcon, CogIcon, ChartPieIcon, PhoneIcon, ClockIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
 import Auth from './components/Auth';
 import AdminPanel from './components/AdminPanel';
@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [userGroups, setUserGroups] = useLocalStorage<UserGroup[]>('auth_groups', DEFAULT_GROUPS);
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('auth_currentUser', null);
   const [notifications, setNotifications] = useLocalStorage<AppNotification[]>('app_notifications', []);
+  const [inventoryCount, setInventoryCount] = useLocalStorage<number>('app_inventory', 45);
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -80,15 +81,7 @@ const App: React.FC = () => {
 
   const handleRegister = (newUser: User) => {
     setUsers(prev => [...prev, newUser]);
-    const adminNotif: AppNotification = {
-        id: 'n-' + Date.now(),
-        message: `Новая заявка: ${newUser.name}. Подтвердите в админ-панели.`,
-        timestamp: new Date().toISOString(),
-        author: 'Регистрация',
-        read: false,
-        type: 'warning'
-    };
-    setNotifications(prev => [adminNotif, ...prev]);
+    createNotification(`Новая заявка на доступ: ${newUser.name}`, 'warning');
   };
 
   const handleSaveStation = (stationToSave: Station) => {
@@ -96,21 +89,18 @@ const App: React.FC = () => {
     const isNew = !existingStation;
     
     if (stationToSave.assignedUserId && (!existingStation || existingStation.assignedUserId !== stationToSave.assignedUserId)) {
-        const assignedUser = users.find(u => u.id === stationToSave.assignedUserId);
-        if (assignedUser) {
-            createNotification(
-                `Вы назначены ответственным за объект: ${stationToSave.locationName}`,
-                'assignment',
-                assignedUser.id
-            );
-        }
+        createNotification(
+            `Вы назначены ответственным за объект: ${stationToSave.locationName}`,
+            'assignment',
+            stationToSave.assignedUserId
+        );
     }
 
     const historyEntry: HistoryEntry = {
         id: 'h-' + Date.now(),
         date: new Date().toISOString(),
         employee: currentUser?.name || 'Система',
-        change: isNew ? 'Создание объекта' : 'Обновление технических данных'
+        change: isNew ? 'Создание объекта' : 'Обновление данных'
     };
 
     const updated = { ...stationToSave, history: [...(stationToSave.history || []), historyEntry] };
@@ -145,13 +135,65 @@ const App: React.FC = () => {
     ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin', label: 'Админ', icon: CogIcon }] : [])
   ];
 
-  const handleNav = (id: string) => {
-    setView(id as AppView);
-  };
+  const renderMainContent = () => {
+    if (!currentUser) return null;
 
-  const openAddForm = () => {
-    setEditingStation(null);
-    setIsFormOpen(true);
+    switch (view) {
+      case 'admin':
+        return currentUser.role === UserRole.ADMIN ? (
+          <AdminPanel 
+            users={users} setUsers={setUsers} stations={stations} setStations={setStations}
+            userGroups={userGroups} setUserGroups={setUserGroups}
+            inventoryCount={inventoryCount} setInventoryCount={setInventoryCount} notifications={notifications}
+            onEditStation={(s) => { setEditingStation(s); setIsFormOpen(true); }}
+            onDeleteStation={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }}
+            onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))}
+            onAddStation={() => { setEditingStation(null); setIsFormOpen(true); }}
+            onBack={() => setView('app')}
+            onSendMessage={(msg, type, userId) => createNotification(msg, type, userId)}
+          />
+        ) : <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />;
+
+      case 'stats':
+        return (
+          <main className="container mx-auto px-4 lg:px-12 py-12">
+            <NetworkSummary stations={stations} allUsers={users} isAdmin={currentUser.role === UserRole.ADMIN} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} />
+          </main>
+        );
+
+      case 'team':
+        return (
+          <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
+              <div className="mb-12"><h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Наша команда</h2></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
+                      <div key={user.id} className="flex items-center justify-between p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                          <div className="flex items-center gap-6">
+                              <div className="h-20 w-20 rounded-[1.75rem] bg-gradient-to-br from-primary-500 to-indigo-700 flex items-center justify-center text-white font-black text-3xl">{user.name.charAt(0)}</div>
+                              <div><h4 className="text-xl font-black text-slate-900 dark:text-white">{user.name}</h4><span className="text-[10px] font-black uppercase text-primary-600">{user.role}</span></div>
+                          </div>
+                          <a href={`tel:${user.phone}`} className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 shadow-sm"><PhoneIcon className="w-6 h-6" /></a>
+                      </div>
+                  ))}
+              </div>
+          </main>
+        );
+
+      case 'app':
+      default:
+        return (
+          <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
+              <div className="mb-12 flex justify-between items-end">
+                  <div><h2 className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2></div>
+                  <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-6 py-5 rounded-[2rem] bg-white dark:bg-slate-900 border-none shadow-sm font-black text-[11px] uppercase tracking-wider text-slate-600 cursor-pointer appearance-none">
+                    <option value="Все">Все статусы</option>
+                    {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+              </div>
+              <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
+          </main>
+        );
+    }
   };
 
   if (!currentUser) return <Auth onLogin={setCurrentUser} onRegister={handleRegister} users={users} />;
@@ -164,12 +206,8 @@ const App: React.FC = () => {
                       <ClockIcon className="w-12 h-12 animate-pulse" />
                   </div>
                   <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-4">Доступ ограничен</h1>
-                  <p className="text-slate-500 font-medium leading-relaxed mb-10">
-                      Ваш аккаунт <b>{currentUser.name}</b> ожидает подтверждения администратором.
-                  </p>
-                  <button onClick={() => setCurrentUser(null)} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-3xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-xl">
-                    Вернуться к логину
-                  </button>
+                  <p className="text-slate-500 font-medium leading-relaxed mb-10">Ваш аккаунт <b>{currentUser.name}</b> ожидает подтверждения администратором.</p>
+                  <button onClick={() => setCurrentUser(null)} className="w-full py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-3xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-xl">Вернуться к логину</button>
               </div>
           </div>
       );
@@ -177,7 +215,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors duration-500">
-      
       {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 bg-white dark:bg-slate-900 border-r border-slate-200/50 dark:border-slate-800/50 h-screen sticky top-0 z-40">
         <div className="p-8 pb-10 flex items-center gap-4">
@@ -186,16 +223,14 @@ const App: React.FC = () => {
            </div>
            <div><h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Fast Charge</h1></div>
         </div>
-
         <nav className="flex-1 px-4 space-y-2">
           {navItems.map(item => (
-            <button key={item.id} onClick={() => handleNav(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+            <button key={item.id} onClick={() => setView(item.id as AppView)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
               <item.icon className="w-5 h-5" />
               <span>{item.label}</span>
             </button>
           ))}
         </nav>
-
         <div className="p-6 border-t border-slate-100 dark:border-slate-800">
            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-xl flex items-center justify-center font-black">{currentUser.name.charAt(0)}</div>
@@ -205,7 +240,6 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="glass sticky top-0 z-30 border-b border-slate-200/50 dark:border-slate-800/50 h-16 md:h-24 shrink-0 pt-safe flex items-center px-4 lg:px-10 justify-between">
             <div className="flex-1 max-w-2xl">
@@ -222,53 +256,15 @@ const App: React.FC = () => {
                   </button>
                   {isNotifOpen && <div className="absolute right-0 mt-4 origin-top-right"><NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} /></div>}
               </div>
-              <button onClick={openAddForm} className="hidden lg:flex px-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Новый объект</button>
+              <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="hidden lg:flex px-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Новый объект</button>
             </div>
         </header>
-
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          {view === 'admin' && currentUser.role === UserRole.ADMIN ? (
-            <AdminPanel 
-                users={users} setUsers={setUsers} stations={stations} setStations={setStations}
-                userGroups={userGroups} setUserGroups={setUserGroups}
-                inventoryCount={25} setInventoryCount={() => {}} notifications={notifications}
-                onEditStation={(s) => { setEditingStation(s); setIsFormOpen(true); }}
-                onDeleteStation={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }}
-                onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))}
-                onAddStation={openAddForm}
-                onBack={() => setView('app')}
-                onSendMessage={(msg, type, userId) => createNotification(msg, type, userId)}
-            />
-          ) : view === 'stats' ? (
-            <main className="container mx-auto px-4 lg:px-12 py-12"><NetworkSummary stations={stations} allUsers={users} isAdmin={currentUser.role === UserRole.ADMIN} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} /></main>
-          ) : view === 'team' ? (
-            <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-                <div className="mb-12"><h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Наша команда</h2></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
-                        <div key={user.id} className="flex items-center justify-between p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                            <div className="flex items-center gap-6">
-                                <div className="h-20 w-20 rounded-[1.75rem] bg-gradient-to-br from-primary-500 to-indigo-700 flex items-center justify-center text-white font-black text-3xl">{user.name.charAt(0)}</div>
-                                <div><h4 className="text-xl font-black text-slate-900 dark:text-white">{user.name}</h4><span className="text-[10px] font-black uppercase text-primary-600">{user.role}</span></div>
-                            </div>
-                            <a href={`tel:${user.phone}`} className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 shadow-sm"><PhoneIcon className="w-6 h-6" /></a>
-                        </div>
-                    ))}
-                </div>
-            </main>
-          ) : (
-            <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-                <div className="mb-12 flex justify-between items-end">
-                    <div><h2 className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2></div>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-6 py-5 rounded-[2rem] bg-white dark:bg-slate-900 border-none shadow-sm font-black text-[11px] uppercase tracking-wider text-slate-600 cursor-pointer appearance-none"><option value="Все">Все статусы</option>{Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
-                </div>
-                <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
-            </main>
-          )}
+          {renderMainContent()}
         </div>
       </div>
 
-      <button onClick={openAddForm} className="fixed z-50 right-10 bottom-10 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all"><PlusIcon className="w-8 h-8" /></button>
+      <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="fixed z-50 right-10 bottom-10 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all"><PlusIcon className="w-8 h-8" /></button>
 
       {isFormOpen && (
         <StationForm station={editingStation} currentUserName={currentUser.name} onSave={handleSaveStation} onClose={() => { setIsFormOpen(false); setEditingStation(null); }} allUsers={users.filter(u => u.status === UserStatus.APPROVED)} isAdmin={currentUser.role === UserRole.ADMIN} />
