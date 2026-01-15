@@ -34,6 +34,7 @@ export interface Station {
   sim?: string;
   freeUsers?: FreeUser[];
   history: HistoryEntry[];
+  photos?: string[];
 }
 
 export enum UserStatus {

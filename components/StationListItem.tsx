@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Station, StationStatus } from '../types';
 import StatusBadge from './StatusBadge';
@@ -51,7 +52,21 @@ const StationListItem: React.FC<StationListItemProps> = ({ station, isSelected, 
             </a>
           )}
         </div>
-        <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 mb-4 border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+
+        {station.photos && station.photos.length > 0 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+            {station.photos.map((photo, index) => (
+              <img 
+                key={index} 
+                src={photo} 
+                alt={`Station view ${index + 1}`} 
+                className="h-24 w-24 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 shadow-sm"
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 mb-4 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
           <p><strong>Установщик:</strong> {station.installer}</p>
           <p><strong>Дата:</strong> {new Date(station.installationDate).toLocaleDateString('ru-RU')}</p>
           {station.sid && <p><strong>SID:</strong> {station.sid}</p>}

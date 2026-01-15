@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Station, StationStatus, FreeUser } from '../types';
 import { generateInstallationNotes } from '../services/geminiService';
-import { SparklesIcon, PlusIcon, TrashIcon } from './Icons';
+import { SparklesIcon, PlusIcon, TrashIcon, CameraIcon } from './Icons';
 
 interface StationFormProps {
   station: Station | null;
@@ -25,8 +26,10 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
     did: '',
     sim: '',
     freeUsers: [],
+    photos: [],
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
     if (station) {
@@ -36,6 +39,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
           did: station.did || '',
           sim: station.sim || '',
           freeUsers: station.freeUsers || [],
+          photos: station.photos || [],
       });
     } else {
         // Reset form for new station
@@ -51,6 +55,7 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
             did: '',
             sim: '',
             freeUsers: [],
+            photos: [],
         });
     }
   }, [station, currentUserName]);
@@ -127,6 +132,36 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
     }));
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const currentPhotos = formData.photos || [];
+    const remainingSlots = 3 - currentPhotos.length;
+    // Explicitly cast to File[] to avoid 'unknown' type inference during Array.from or slice
+    const filesToProcess = Array.from(files).slice(0, remainingSlots) as File[];
+
+    filesToProcess.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData(prev => ({
+          ...prev,
+          photos: [...(prev.photos || []), base64String].slice(0, 3)
+        }));
+      };
+      // Explicitly cast to Blob to ensure the parameter type is satisfied
+      reader.readAsDataURL(file as Blob);
+    });
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos?.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -162,6 +197,43 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
             <label htmlFor="address" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Адрес</label>
             <input type="text" name="address" id="address" value={formData.address} onChange={handleChange} required className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200" />
           </div>
+
+          <fieldset className="p-4 border border-slate-300 dark:border-slate-600 rounded-md">
+            <legend className="text-sm font-medium text-slate-700 dark:text-slate-300 px-2">Фотоотчет (до 3 шт.)</legend>
+            <div className="flex gap-3 mt-2 overflow-x-auto pb-2">
+              {formData.photos?.map((photo, index) => (
+                <div key={index} className="relative h-20 w-20 shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900">
+                  <img src={photo} alt={`Station ${index + 1}`} className="h-full w-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => handleRemovePhoto(index)} 
+                    className="absolute top-0.5 right-0.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-md"
+                  >
+                    <TrashIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {(formData.photos?.length || 0) < 3 && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-20 w-20 flex flex-col items-center justify-center gap-1 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-slate-400 hover:text-primary-500 hover:border-primary-500 transition-all bg-slate-50 dark:bg-slate-700/50"
+                >
+                  <CameraIcon className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Фото</span>
+                </button>
+              )}
+            </div>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handlePhotoUpload} 
+              accept="image/*" 
+              capture="environment" 
+              className="hidden" 
+              multiple={false}
+            />
+          </fieldset>
 
           <fieldset className="p-4 border border-slate-300 dark:border-slate-600 rounded-md">
             <legend className="text-sm font-medium text-slate-700 dark:text-slate-300 px-2">Геопозиция (необязательно)</legend>
