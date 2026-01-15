@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Station, StationStatus, User } from '../types';
+import { Station, StationStatus, User, FreeUser } from '../types';
 import { generateInstallationNotes } from '../services/geminiService';
-import { SparklesIcon, UsersIcon, CameraIcon, TrashIcon } from './Icons';
+import { SparklesIcon, UsersIcon, CameraIcon, TrashIcon, PlusIcon, PhoneIcon } from './Icons';
 
 interface StationFormProps {
   station: Station | null;
@@ -31,6 +31,10 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
     photos: [],
     assignedUserId: '',
   });
+
+  // State for new free user input
+  const [newFreeUser, setNewFreeUser] = useState({ fullName: '', position: '', phone: '' });
+  
   const [isGenerating, setIsGenerating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +57,31 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     if (validationError) setValidationError(null);
+  };
+
+  const handleAddFreeUser = () => {
+    if (!newFreeUser.fullName.trim()) return;
+    
+    const userToAdd: FreeUser = {
+      id: 'fu-' + Date.now(),
+      fullName: newFreeUser.fullName,
+      position: newFreeUser.position,
+      phone: newFreeUser.phone
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      freeUsers: [...(prev.freeUsers || []), userToAdd]
+    }));
+    
+    setNewFreeUser({ fullName: '', position: '', phone: '' });
+  };
+
+  const handleRemoveFreeUser = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      freeUsers: prev.freeUsers?.filter(u => u.id !== id)
+    }));
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +132,6 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Валидация обязательных полей
     const requiredFields: (keyof FormData)[] = ['locationName', 'address', 'sid', 'did', 'sim'];
     const missingFields = requiredFields.filter(field => !String(formData[field]).trim());
 
@@ -181,6 +209,67 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
             </div>
           </div>
 
+          {/* Бесплатные пользователи (владельцы заведения) */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between ml-1">
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">Бесплатные пользователи</label>
+              <span className="text-[10px] font-bold text-primary-500 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded-md">Менеджеры заведения</span>
+            </div>
+            
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-[2rem] border border-slate-100 dark:border-slate-700/50 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input 
+                  type="text" 
+                  placeholder="ФИО" 
+                  value={newFreeUser.fullName}
+                  onChange={e => setNewFreeUser({...newFreeUser, fullName: e.target.value})}
+                  className="px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border-none text-xs font-bold"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Должность" 
+                  value={newFreeUser.position}
+                  onChange={e => setNewFreeUser({...newFreeUser, position: e.target.value})}
+                  className="px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border-none text-xs font-bold"
+                />
+                <input 
+                  type="tel" 
+                  placeholder="Телефон" 
+                  value={newFreeUser.phone}
+                  onChange={e => setNewFreeUser({...newFreeUser, phone: e.target.value})}
+                  className="px-4 py-3 bg-white dark:bg-slate-800 rounded-xl border-none text-xs font-bold sm:col-span-2"
+                />
+              </div>
+              <button 
+                type="button" 
+                onClick={handleAddFreeUser}
+                className="w-full py-3 bg-slate-200 dark:bg-slate-700 hover:bg-primary-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              >
+                <PlusIcon className="w-4 h-4" /> Добавить в список
+              </button>
+            </div>
+
+            {formData.freeUsers && formData.freeUsers.length > 0 && (
+              <div className="grid grid-cols-1 gap-3">
+                {formData.freeUsers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm animate-fade-in">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-slate-900 dark:text-white truncate">{u.fullName}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight truncate">{u.position || 'Должность не указана'} • {u.phone || 'Нет тел.'}</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveFreeUser(u.id)}
+                      className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Photo Section */}
           <div className="space-y-4">
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Фотофиксация (макс. 3)</label>
@@ -240,9 +329,6 @@ const StationForm: React.FC<StationFormProps> = ({ station, currentUserName, onS
                       ))}
                   </select>
                 </div>
-                <p className="text-[10px] text-indigo-400 mt-4 font-bold uppercase tracking-wider opacity-80 leading-relaxed italic">
-                    * Сотрудник получит персональное уведомление после сохранения.
-                </p>
               </div>
           )}
 
