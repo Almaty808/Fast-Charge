@@ -46,6 +46,8 @@ export enum UserStatus {
 export enum UserRole {
   USER = 'Пользователь',
   ADMIN = 'Администратор',
+  INSTALLER = 'Монтажник',
+  MANAGER = 'Менеджер',
 }
 
 export enum AppPermission {
@@ -82,4 +84,23 @@ export interface AppNotification {
   read: boolean;
   type: 'info' | 'success' | 'warning' | 'danger' | 'push' | 'email' | 'assignment';
   targetUserId?: string; // Для кого уведомление (null если для всех админов)
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: 'hardware' | 'cables' | 'sim' | 'marketing';
+  quantity: number;
+  minThreshold: number;
+  unit: string;
+  lastUpdated: string;
+}
+
+export interface StockLog {
+  id: string;
+  itemId: string;
+  itemName: string;
+  change: number;
+  author: string;
+  timestamp: string;
 }
