@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole, AppNotification, UserGroup, AppPermission } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-import { PlusIcon, SearchIcon, UsersIcon, LogoutIcon, BellIcon, MapPinIcon, CogIcon, ChartPieIcon, PhoneIcon, ClockIcon } from './components/Icons';
+// Added EnvelopeIcon to the icons import list
+import { PlusIcon, SearchIcon, UsersIcon, LogoutIcon, BellIcon, MapPinIcon, CogIcon, ChartPieIcon, PhoneIcon, ClockIcon, CheckIcon, EnvelopeIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
 import Auth from './components/Auth';
 import AdminPanel from './components/AdminPanel';
@@ -56,7 +57,8 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<AppView>('app');
 
-  const pendingUsersCount = useMemo(() => users.filter(u => u.status === UserStatus.PENDING).length, [users]);
+  const pendingUsers = useMemo(() => users.filter(u => u.status === UserStatus.PENDING), [users]);
+  const pendingUsersCount = pendingUsers.length;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
@@ -92,6 +94,11 @@ const App: React.FC = () => {
   const handleRegister = (newUser: User) => {
     setUsers(prev => [...prev, newUser]);
     createNotification(`Новая заявка на доступ: ${newUser.name}`, 'warning');
+  };
+
+  const handleApproveFromTeam = (userId: string) => {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: UserStatus.APPROVED } : u));
+      createNotification('Аккаунт подтвержден через панель Команды', 'success', userId);
   };
 
   const handleSaveStation = (stationToSave: Station) => {
@@ -141,7 +148,7 @@ const App: React.FC = () => {
   const navItems: NavItem[] = [
     { id: 'app', label: 'Объекты', icon: MapPinIcon },
     { id: 'stats', label: 'Аналитика', icon: ChartPieIcon },
-    { id: 'team', label: 'Команда', icon: UsersIcon },
+    { id: 'team', label: 'Команда', icon: UsersIcon, badge: isAdmin && pendingUsersCount > 0 },
     ...(isAdmin ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon, badge: pendingUsersCount > 0 }] : [])
   ];
 
@@ -163,9 +170,7 @@ const App: React.FC = () => {
             onSendMessage={(msg, type, userId) => createNotification(msg, type, userId)}
           />
         ) : (
-          <main className="container mx-auto px-4 lg:px-12 py-12">
-            <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
-          </main>
+          <main className="container mx-auto px-4 lg:px-12 py-12 text-center text-slate-500">У вас нет прав доступа к этой панели.</main>
         );
 
       case 'stats':
@@ -182,21 +187,54 @@ const App: React.FC = () => {
                   <div className="w-14 h-14 bg-primary-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl">
                       <UsersIcon className="w-8 h-8" />
                   </div>
-                  <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Команда Fast Charge</h2>
+                  <div>
+                    <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Команда Fast Charge</h2>
+                    <p className="text-slate-400 font-bold mt-2">Реестр сотрудников и управление доступом</p>
+                  </div>
               </div>
+
+              {/* Показывать новых сотрудников в списке команды для админа */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
-                      <div key={user.id} className="flex items-center justify-between p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
-                          <div className="flex items-center gap-6">
-                              <div className="h-16 w-16 rounded-[1.25rem] bg-gradient-to-br from-primary-500 to-indigo-700 flex items-center justify-center text-white font-black text-2xl">{user.name.charAt(0)}</div>
-                              <div>
-                                  <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none mb-2">{user.name}</h4>
-                                  <span className="text-[9px] font-black uppercase text-primary-600 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded">{user.role}</span>
-                              </div>
-                          </div>
-                          <a href={`tel:${user.phone}`} className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 dark:border-slate-700 shadow-sm hover:bg-primary-600 hover:text-white transition-all"><PhoneIcon className="w-5 h-5" /></a>
-                      </div>
-                  ))}
+                  {users.map(user => {
+                      const isPending = user.status === UserStatus.PENDING;
+                      if (isPending && !isAdmin) return null;
+
+                      return (
+                        <div key={user.id} className={`flex flex-col p-8 bg-white dark:bg-slate-900 rounded-[3rem] border-2 shadow-sm transition-all ${isPending ? 'border-rose-500 shadow-rose-500/10' : 'border-slate-100 dark:border-slate-800'}`}>
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className={`h-16 w-16 rounded-[1.25rem] flex items-center justify-center text-white font-black text-2xl ${isPending ? 'bg-rose-500 animate-pulse' : 'bg-gradient-to-br from-primary-500 to-indigo-700'}`}>
+                                        {user.name.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none mb-2 truncate">{user.name}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${isPending ? 'bg-rose-50 text-rose-600' : 'bg-primary-50 text-primary-600 dark:bg-primary-900/20'}`}>
+                                                {isPending ? 'Ожидает доступа' : user.role}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {!isPending && (
+                                    <a href={`tel:${user.phone}`} className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 dark:border-slate-700 shadow-sm hover:bg-primary-600 hover:text-white transition-all"><PhoneIcon className="w-5 h-5" /></a>
+                                )}
+                            </div>
+                            <div className="space-y-2 mb-6">
+                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2"><EnvelopeIcon className="w-3.5 h-3.5" /> {user.email}</p>
+                                <p className="text-xs text-slate-500 font-medium flex items-center gap-2"><PhoneIcon className="w-3.5 h-3.5" /> {user.phone}</p>
+                            </div>
+                            
+                            {isPending && isAdmin && (
+                                <button 
+                                    onClick={() => handleApproveFromTeam(user.id)}
+                                    className="w-full py-4 bg-rose-600 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-rose-500/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <CheckIcon className="w-4 h-4" /> Подтвердить регистрацию
+                                </button>
+                            )}
+                        </div>
+                      );
+                  })}
               </div>
           </main>
         );
@@ -205,25 +243,6 @@ const App: React.FC = () => {
       default:
         return (
           <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-              {/* Alert for Pending Users (Only for Admins) */}
-              {isAdmin && pendingUsersCount > 0 && (
-                <div 
-                  onClick={() => setView('admin')}
-                  className="mb-8 p-6 bg-rose-500 text-white rounded-[2.5rem] shadow-2xl shadow-rose-500/30 flex items-center justify-between cursor-pointer group hover:bg-rose-600 transition-all border-4 border-rose-400/20 animate-pulse"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                       <ClockIcon className="w-7 h-7" />
-                    </div>
-                    <div>
-                      <h4 className="font-black text-xl tracking-tight">Требуется подтверждение!</h4>
-                      <p className="text-sm font-bold opacity-80">У вас {pendingUsersCount} новых заявок от сотрудников.</p>
-                    </div>
-                  </div>
-                  <button className="px-6 py-3 bg-white text-rose-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg group-hover:scale-110 transition-transform">Перейти</button>
-                </div>
-              )}
-
               <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div>
                     <h2 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2>
@@ -301,7 +320,7 @@ const App: React.FC = () => {
               <div className="relative">
                   <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500 ${pendingUsersCount > 0 ? 'ring-4 ring-rose-500/20' : ''}`}>
                       <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${pendingUsersCount > 0 ? 'text-rose-500' : ''}`} />
-                      {(userNotifications.some(n => !n.read) || pendingUsersCount > 0) && (
+                      {(userNotifications.some(n => !n.read) || (isAdmin && pendingUsersCount > 0)) && (
                         <span className={`absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 ${pendingUsersCount > 0 ? 'animate-ping' : ''}`} />
                       )}
                   </button>
@@ -310,6 +329,28 @@ const App: React.FC = () => {
               <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="hidden lg:flex px-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Новый объект</button>
             </div>
         </header>
+        
+        {/* Global Admin Banner for Pending Requests */}
+        {isAdmin && pendingUsersCount > 0 && view !== 'admin' && (
+          <div 
+            onClick={() => setView('admin')}
+            className="mx-4 md:mx-10 mt-6 p-4 md:p-6 bg-rose-600 text-white rounded-[2rem] shadow-xl shadow-rose-500/20 flex items-center justify-between cursor-pointer hover:bg-rose-700 transition-all border border-rose-400/30 animate-scale-in"
+          >
+            <div className="flex items-center gap-4 md:gap-6">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                 <UsersIcon className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-black text-sm md:text-lg tracking-tight leading-none">Новые сотрудники ждут подтверждения</h4>
+                <p className="text-[10px] md:text-xs font-bold opacity-80 mt-1">Всего {pendingUsersCount} необработанных {pendingUsersCount === 1 ? 'заявка' : 'заявок'}. Нажмите, чтобы открыть панель.</p>
+              </div>
+            </div>
+            <div className="bg-white/20 p-2 md:p-3 rounded-xl">
+               <CheckIcon className="w-4 h-4 md:w-5 md:h-5" />
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {renderMainContent()}
         </div>

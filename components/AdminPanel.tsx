@@ -174,14 +174,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const renderDashboard = () => (
         <div className="space-y-6">
             {pendingUsers.length > 0 && (
-                <div className="bg-rose-600 rounded-[2.5rem] p-8 md:p-10 text-white shadow-[0_20px_50px_rgba(225,29,72,0.3)] animate-slide-up border-4 border-rose-500/50">
+                <div className="bg-rose-600 rounded-[2.5rem] p-8 md:p-10 text-white shadow-[0_20px_50px_rgba(225,29,72,0.3)] animate-scale-in border-4 border-rose-500/50">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                         <div className="flex items-center gap-6">
                             <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-[1.75rem] flex items-center justify-center animate-bounce shadow-inner shrink-0">
                                 <UsersIcon className="w-8 h-8 md:w-10 md:h-10 text-white" />
                             </div>
                             <div>
-                                <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Новые заявки!</h3>
+                                <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Обнаружены заявки!</h3>
                                 <p className="text-rose-100 font-bold max-w-sm leading-relaxed text-sm md:text-base">
                                     {pendingUsers.length} {pendingUsers.length === 1 ? 'сотрудник ожидает' : 'сотрудника ожидают'} подтверждения регистрации.
                                 </p>
@@ -192,7 +192,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 onClick={() => setActiveTab('users')}
                                 className="flex-1 md:flex-none px-10 py-5 bg-white text-rose-600 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-rose-50 active:scale-95 transition-all"
                             >
-                                Посмотреть всех
+                                Перейти в список
                             </button>
                         </div>
                     </div>
@@ -291,7 +291,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-500 font-bold">Версия</span>
-                                <span className="text-slate-400 font-black">2.5.4-pro</span>
+                                <span className="text-slate-400 font-black">2.5.5-pro</span>
                             </div>
                         </div>
                     </div>
