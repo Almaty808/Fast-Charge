@@ -65,33 +65,29 @@ const App: React.FC = () => {
     const masterEmail = 'almaty808@gmail.com';
     const masterLogin = 'admin-808';
     
-    const masterExists = users.some(u => 
-      (u.email && u.email.toLowerCase() === masterEmail) || 
-      (u.loginId && u.loginId.toLowerCase() === masterLogin)
-    );
-
-    if (!masterExists) {
-      const master: User = {
-        id: 'master-001',
-        loginId: masterLogin,
-        name: 'Главный Администратор',
-        email: masterEmail,
-        phone: '+7 777 808 8888',
-        password: '1qazaq1',
-        status: UserStatus.APPROVED,
-        role: UserRole.ADMIN,
-        groupId: 'g-admin'
-      };
-      // Используем функциональное обновление, чтобы не зависеть от замыкания 'users'
-      setUsers(prev => {
-        const stillMissing = !prev.some(u => 
-          (u.email && u.email.toLowerCase() === masterEmail) || 
-          (u.loginId && u.loginId.toLowerCase() === masterLogin)
+    setUsers(prev => {
+        const masterExists = prev.some(u => 
+            (u.email && u.email.toLowerCase() === masterEmail) || 
+            (u.loginId && u.loginId.toLowerCase() === masterLogin)
         );
-        return stillMissing ? [master, ...prev] : prev;
-      });
-    }
-  }, [setUsers]); // Убираем 'users' из зависимостей для предотвращения циклов
+
+        if (!masterExists) {
+            const master: User = {
+                id: 'master-001',
+                loginId: masterLogin,
+                name: 'Главный Администратор',
+                email: masterEmail,
+                phone: '+7 777 808 8888',
+                password: '1qazaq1',
+                status: UserStatus.APPROVED,
+                role: UserRole.ADMIN,
+                groupId: 'g-admin'
+            };
+            return [master, ...prev];
+        }
+        return prev;
+    });
+  }, []);
 
   const createNotification = (message: string, type: AppNotification['type'] = 'info', targetUserId?: string) => {
     const newNotif: AppNotification = {
@@ -108,12 +104,12 @@ const App: React.FC = () => {
 
   const handleRegister = (newUser: User) => {
     setUsers(prev => [...prev, newUser]);
-    createNotification(`Новая заявка на доступ: ${newUser.name}`, 'warning');
+    createNotification(`Новый запрос доступа: ${newUser.name} (${newUser.loginId})`, 'warning');
   };
 
   const handleApproveFromTeam = (userId: string) => {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: UserStatus.APPROVED } : u));
-      createNotification('Аккаунт подтвержден через панель Команды', 'success', userId);
+      createNotification('Ваш доступ в Fast Charge подтвержден!', 'success', userId);
   };
 
   const handleSaveStation = (stationToSave: Station) => {
@@ -234,7 +230,7 @@ const App: React.FC = () => {
                                     onClick={() => handleApproveFromTeam(user.id)}
                                     className="w-full py-4 bg-rose-600 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <CheckIcon className="w-4 h-4" /> Подтвердить
+                                    <CheckIcon className="w-4 h-4" /> Подтвердить доступ
                                 </button>
                             )}
                         </div>
@@ -273,9 +269,9 @@ const App: React.FC = () => {
                   <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center text-amber-500 mx-auto mb-8">
                       <ClockIcon className="w-10 h-10 animate-pulse" />
                   </div>
-                  <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-4">Ожидайте...</h1>
-                  <p className="text-slate-500 font-medium leading-relaxed mb-8">Ваш аккаунт <b>{currentUser.name}</b> на проверке у администратора.</p>
-                  <button onClick={() => setCurrentUser(null)} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95">Назад</button>
+                  <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-4">В процессе...</h1>
+                  <p className="text-slate-500 font-medium leading-relaxed mb-8">Ваш аккаунт <b>{currentUser.name}</b> ожидает активации администратором.</p>
+                  <button onClick={() => setCurrentUser(null)} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95">Выйти</button>
               </div>
           </div>
       );
