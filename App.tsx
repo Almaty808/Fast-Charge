@@ -34,6 +34,12 @@ const DEFAULT_GROUPS: UserGroup[] = [
 
 type AppView = 'app' | 'admin' | 'stats' | 'team';
 
+interface NavItem {
+  id: AppView;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+}
+
 const App: React.FC = () => {
   const [stations, setStations] = useLocalStorage<Station[]>('stations', INITIAL_STATIONS);
   const [users, setUsers] = useLocalStorage<User[]>('auth_users', []);
@@ -128,11 +134,11 @@ const App: React.FC = () => {
       return notifications.filter(n => !n.targetUserId || n.targetUserId === currentUser?.id || currentUser?.role === UserRole.ADMIN);
   }, [notifications, currentUser]);
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { id: 'app', label: 'Объекты', icon: MapPinIcon },
     { id: 'stats', label: 'Аналитика', icon: ChartPieIcon },
     { id: 'team', label: 'Команда', icon: UsersIcon },
-    ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin', label: 'Админ', icon: CogIcon }] : [])
+    ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon }] : [])
   ];
 
   const renderMainContent = () => {
@@ -152,7 +158,11 @@ const App: React.FC = () => {
             onBack={() => setView('app')}
             onSendMessage={(msg, type, userId) => createNotification(msg, type, userId)}
           />
-        ) : <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />;
+        ) : (
+          <main className="container mx-auto px-4 lg:px-12 py-12">
+            <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
+          </main>
+        );
 
       case 'stats':
         return (
@@ -164,15 +174,23 @@ const App: React.FC = () => {
       case 'team':
         return (
           <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-              <div className="mb-12"><h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Наша команда</h2></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="mb-12 flex items-center gap-4">
+                  <div className="w-14 h-14 bg-primary-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl">
+                      <UsersIcon className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Команда Fast Charge</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
-                      <div key={user.id} className="flex items-center justify-between p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+                      <div key={user.id} className="flex items-center justify-between p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
                           <div className="flex items-center gap-6">
-                              <div className="h-20 w-20 rounded-[1.75rem] bg-gradient-to-br from-primary-500 to-indigo-700 flex items-center justify-center text-white font-black text-3xl">{user.name.charAt(0)}</div>
-                              <div><h4 className="text-xl font-black text-slate-900 dark:text-white">{user.name}</h4><span className="text-[10px] font-black uppercase text-primary-600">{user.role}</span></div>
+                              <div className="h-16 w-16 rounded-[1.25rem] bg-gradient-to-br from-primary-500 to-indigo-700 flex items-center justify-center text-white font-black text-2xl">{user.name.charAt(0)}</div>
+                              <div>
+                                  <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none mb-2">{user.name}</h4>
+                                  <span className="text-[9px] font-black uppercase text-primary-600 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded">{user.role}</span>
+                              </div>
                           </div>
-                          <a href={`tel:${user.phone}`} className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 shadow-sm"><PhoneIcon className="w-6 h-6" /></a>
+                          <a href={`tel:${user.phone}`} className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-primary-600 border border-slate-100 dark:border-slate-700 shadow-sm hover:bg-primary-600 hover:text-white transition-all"><PhoneIcon className="w-5 h-5" /></a>
                       </div>
                   ))}
               </div>
@@ -183,12 +201,17 @@ const App: React.FC = () => {
       default:
         return (
           <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
-              <div className="mb-12 flex justify-between items-end">
-                  <div><h2 className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2></div>
-                  <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-6 py-5 rounded-[2rem] bg-white dark:bg-slate-900 border-none shadow-sm font-black text-[11px] uppercase tracking-wider text-slate-600 cursor-pointer appearance-none">
-                    <option value="Все">Все статусы</option>
-                    {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+              <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <h2 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2>
+                    <p className="text-slate-400 font-bold mt-2">Управление и мониторинг активных станций</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-6 py-4 rounded-[1.5rem] bg-white dark:bg-slate-900 border-none shadow-sm font-black text-[11px] uppercase tracking-wider text-slate-600 cursor-pointer appearance-none border border-slate-100 dark:border-slate-800">
+                      <option value="Все">Все статусы</option>
+                      {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
               </div>
               <StationList stations={displayedStations} selectedStations={new Set()} allUsers={users} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} onToggleSelection={() => {}} />
           </main>
@@ -224,8 +247,8 @@ const App: React.FC = () => {
            <div><h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">Fast Charge</h1></div>
         </div>
         <nav className="flex-1 px-4 space-y-2">
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => setView(item.id as AppView)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+          {navItems.map((item: NavItem) => (
+            <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
               <item.icon className="w-5 h-5" />
               <span>{item.label}</span>
             </button>

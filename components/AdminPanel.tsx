@@ -14,15 +14,21 @@ import {
     PlusIcon,
     SearchIcon,
     PhoneIcon,
-    WhatsAppIcon,
     BellIcon,
     EnvelopeIcon,
     HistoryIcon,
-    DownloadIcon,
-    ChevronDownIcon,
-    CameraIcon
+    DownloadIcon
 } from './Icons';
 import StatusBadge from './StatusBadge';
+
+type AdminTab = 'dashboard' | 'users' | 'tasks' | 'stations' | 'groups' | 'logs' | 'settings';
+
+interface AdminMenuItem {
+    id: AdminTab;
+    label: string;
+    icon: React.FC<{ className?: string }>;
+    badge?: boolean;
+}
 
 interface AdminPanelProps {
     users: User[];
@@ -46,7 +52,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     users, setUsers, stations, setStations, userGroups, setUserGroups, inventoryCount, setInventoryCount, notifications,
     onEditStation, onDeleteStation, onStatusChange, onAddStation, onBack, onSendMessage
 }) => {
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'tasks' | 'stations' | 'groups' | 'logs' | 'settings'>('dashboard');
+    const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
     const [stationSearch, setStationSearch] = useState('');
     const [userSearch, setUserSearch] = useState('');
     const [msgModal, setMsgModal] = useState<{ userId: string, type: 'push' | 'email' } | null>(null);
@@ -103,7 +109,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setIsGroupFormOpen(false);
     };
 
-    const menuItems = [
+    const menuItems: AdminMenuItem[] = [
         { id: 'dashboard', label: 'Панель управления', icon: ChartIcon },
         { id: 'stations', label: 'Все объекты', icon: MapPinIcon },
         { id: 'tasks', label: 'Задачи команды', icon: CheckIcon },
@@ -134,7 +140,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Виджет новых заявок на Dashboard */}
                     {pendingUsers.length > 0 && (
                         <div className="bg-white dark:bg-slate-800 rounded-[2rem] border-2 border-rose-100 dark:border-rose-900/30 p-8 shadow-xl shadow-rose-500/5">
                             <div className="flex justify-between items-center mb-6">
@@ -240,7 +245,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     />
                 </div>
 
-                {/* Секция заявок - всегда сверху, если есть */}
                 {filteredPending.length > 0 && (
                     <div className="space-y-6">
                         <div className="flex items-center gap-3">
@@ -278,7 +282,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
 
-                {/* Основной список активных сотрудников */}
                 <div className="space-y-6">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Активный штат ({activeUsers.length})</h3>
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -461,10 +464,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <nav className="flex-1 px-4 space-y-2 overflow-y-auto scrollbar-hide">
-                    {menuItems.map(item => (
+                    {menuItems.map((item: AdminMenuItem) => (
                         <button 
                             key={item.id} 
-                            onClick={() => setActiveTab(item.id as any)} 
+                            onClick={() => setActiveTab(item.id)} 
                             className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${
                                 activeTab === item.id 
                                 ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/30' 
@@ -488,8 +491,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* Mobile Navigation */}
             <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-4 shrink-0 overflow-x-auto scrollbar-hide pt-safe sticky top-0 z-[60]">
                 <div className="flex gap-6 py-4 min-w-max">
-                    {menuItems.map(item => (
-                        <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${activeTab === item.id ? 'text-primary-600 border-b-2 border-primary-600 pb-2' : 'text-slate-400'}`}>
+                    {menuItems.map((item: AdminMenuItem) => (
+                        <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${activeTab === item.id ? 'text-primary-600 border-b-2 border-primary-600 pb-2' : 'text-slate-400'}`}>
                             <item.icon className="w-4 h-4" /> {item.label.split(' ')[0]}
                             {item.badge && <span className="w-2 h-2 bg-rose-500 rounded-full" />}
                         </button>
