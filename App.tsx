@@ -60,9 +60,22 @@ const App: React.FC = () => {
   const pendingUsersCount = pendingUsers.length;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
+  // Cleanup effect: Удаление указанного пользователя и инициализация админа
   useEffect(() => {
+    const targetEmail = 'alimzantaziev@gmail.com';
     const masterEmail = 'almaty808@gmail.com';
-    if (!users.find(u => u.email === masterEmail)) {
+    
+    let updatedUsers = [...users];
+    let changed = false;
+
+    // 1. Удаляем целевой email
+    if (updatedUsers.some(u => u.email.toLowerCase().trim() === targetEmail)) {
+        updatedUsers = updatedUsers.filter(u => u.email.toLowerCase().trim() !== targetEmail);
+        changed = true;
+    }
+
+    // 2. Гарантируем наличие главного админа
+    if (!updatedUsers.find(u => u.email === masterEmail)) {
       const master: User = {
         id: 'master-001',
         name: 'Главный Администратор',
@@ -73,7 +86,12 @@ const App: React.FC = () => {
         role: UserRole.ADMIN,
         groupId: 'g-admin'
       };
-      setUsers([master, ...users]);
+      updatedUsers = [master, ...updatedUsers];
+      changed = true;
+    }
+
+    if (changed) {
+        setUsers(updatedUsers);
     }
   }, [users, setUsers]);
 

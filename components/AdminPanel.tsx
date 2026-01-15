@@ -147,13 +147,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         });
     };
 
-    const handleSend = () => {
-        if (!msgModal || !msgBody.trim()) return;
-        onSendMessage(msgBody, msgModal.type, msgModal.userId);
-        setMsgModal(null);
-        setMsgBody('');
-    };
-
     // User CRUD logic
     const handleOpenUserModal = (user: User | null = null) => {
         if (user) {
@@ -182,9 +175,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleSaveUser = () => {
         const normalizedEmail = userData.email.toLowerCase().trim();
-        const cleanPassword = userData.password.trim();
+        const rawPassword = userData.password; // НЕ обрезаем пробелы в пароле!
 
-        if (!normalizedEmail || !userData.name || !cleanPassword) {
+        if (!normalizedEmail || !userData.name || !rawPassword) {
             alert('Заполните обязательные поля: Имя, Email и Пароль');
             return;
         }
@@ -194,7 +187,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 ...u, 
                 ...userData, 
                 email: normalizedEmail,
-                password: cleanPassword 
+                password: rawPassword 
             } : u));
             onSendMessage(`Ваш профиль был обновлен администратором.`, 'info', editingUser.id);
         } else {
@@ -207,7 +200,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 id: 'u-' + Date.now(),
                 ...userData,
                 email: normalizedEmail,
-                password: cleanPassword,
+                password: rawPassword,
                 status: UserStatus.APPROVED 
             };
             setUsers(prev => [...prev, newUser]);
@@ -362,7 +355,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div className="flex flex-col gap-3 w-full sm:w-auto shrink-0">
                                     <div className="flex gap-2">
                                         <button onClick={() => handleOpenUserModal(u)} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-primary-500 transition-colors" title="Edit"><EditIcon className="w-5 h-5" /></button>
-                                        <button onClick={() => setMsgModal({ userId: u.id, type: 'push' })} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-primary-500 transition-colors" title="Push"><BellIcon className="w-5 h-5" /></button>
                                         <button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-3 bg-red-50 dark:bg-red-900/10 rounded-xl hover:bg-red-100 text-red-500 transition-colors" title="Delete"><TrashIcon className="w-5 h-5" /></button>
                                     </div>
                                     <select value={u.groupId || ''} onChange={(e) => setUsers(us => us.map(user => user.id === u.id ? { ...user, groupId: e.target.value } : user))} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-700/50 border-none rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500"><option value="">Без группы</option>{userGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
@@ -425,7 +417,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ФИО Сотрудника <span className="text-rose-500">*</span></label><input value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} placeholder="Александр Петров" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email (Логин) <span className="text-rose-500">*</span></label><input type="email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} placeholder="petrov@fastcharge.com" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
-                                <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Пароль <span className="text-rose-500">*</span></label><input type="text" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} placeholder="Введите пароль" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
+                                <div>
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Пароль <span className="text-rose-500">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        value={userData.password} 
+                                        onChange={e => setUserData({...userData, password: e.target.value})} 
+                                        placeholder="Введите пароль" 
+                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" 
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1">Админ видит пароль как текст для удобства передачи сотруднику.</p>
+                                </div>
                                 <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Телефон</label><input type="tel" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} placeholder="+7 (___) ___ __ __" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
                             </div>
                             <div>

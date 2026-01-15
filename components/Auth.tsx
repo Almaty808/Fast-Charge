@@ -36,8 +36,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
         e.preventDefault();
         setError('');
         
+        // Email нормализуем, пароль — НЕТ (пробелы в пароле могут быть частью пароля)
         const searchEmail = email.toLowerCase().trim();
-        const searchPassword = password.trim();
+        const searchPassword = password; 
 
         const user = users.find(u => 
             u.email.toLowerCase().trim() === searchEmail
@@ -48,8 +49,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
             return;
         }
 
+        // Проверка пароля без лишних модификаций
         if (user.password !== searchPassword) {
-            setError('Неверный пароль. Пожалуйста, проверьте раскладку и регистр.');
+            setError('Неверный пароль. Проверьте раскладку, регистр и наличие лишних пробелов.');
             return;
         }
 
@@ -76,7 +78,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
             name: name.trim(),
             email: normalizedEmail,
             phone: phone.trim(),
-            password: password,
+            password: password, // Сохраняем как введено
             status: UserStatus.PENDING,
             role: UserRole.USER,
         };
