@@ -1,12 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole } from './types';
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole, AppNotification } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon, UsersIcon, LogoutIcon } from './components/Icons';
+// Add missing MapPinIcon and CogIcon to the imports
+import { PlusIcon, PackageIcon, SearchIcon, DownloadIcon, UsersIcon, LogoutIcon, BellIcon, PhoneIcon, WhatsAppIcon, MapPinIcon, CogIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
 import Auth from './components/Auth';
 import AdminPanel from './components/AdminPanel';
-
+import NotificationCenter from './components/NotificationCenter';
 
 const INITIAL_STATIONS: Station[] = [
   {
@@ -47,21 +49,7 @@ const INITIAL_STATIONS: Station[] = [
     history: [
         { id: 'h2', date: '2024-07-18T12:00:00Z', employee: 'Елена Сидорова', change: 'Станция создана' }
     ]
-  },
-  {
-    id: '3',
-    locationName: 'Аэропорт "Кольцово"',
-    address: 'пл. Бахчиванджи, 1, Екатеринбург',
-    installer: 'Алексей Иванов',
-    installationDate: '2024-06-10',
-    status: StationStatus.MAINTENANCE,
-    notes: 'Один из USB-портов не работает. Требуется замена кабеля.',
-    coordinates: null,
-    history: [
-        { id: 'h3b', date: '2024-06-25T15:30:00Z', employee: 'Алексей Иванов', change: 'Статус изменен с "Установлено" на "Обслуживание"' },
-        { id: 'h3a', date: '2024-06-10T09:00:00Z', employee: 'Алексей Иванов', change: 'Станция создана' }
-    ]
-  },
+  }
 ];
 
 const generateHistoryEntry = (employee: string, change: string): HistoryEntry => ({
@@ -73,51 +61,16 @@ const generateHistoryEntry = (employee: string, change: string): HistoryEntry =>
 
 const diffStations = (oldS: Station, newS: Station): string[] => {
     const changes: string[] = [];
-    
-    const simpleFields: { key: keyof Station; label: string }[] = [
-        { key: 'locationName', label: 'Название местоположения' },
-        { key: 'address', label: 'Адрес' },
-        { key: 'status', label: 'Статус' },
-        { key: 'notes', label: 'Заметки' },
-        { key: 'sid', label: 'SID' },
-        { key: 'did', label: 'DID' },
-        { key: 'sim', label: 'SIM' },
-        { key: 'installer', label: 'Установщик' },
-        { key: 'installationDate', label: 'Дата установки' },
+    const fields: { key: keyof Station; label: string }[] = [
+        { key: 'locationName', label: 'Название' }, { key: 'address', label: 'Адрес' },
+        { key: 'status', label: 'Статус' }, { key: 'notes', label: 'Заметки' },
+        { key: 'sid', label: 'SID' }, { key: 'did', label: 'DID' }, { key: 'sim', label: 'SIM' }
     ];
-
-    simpleFields.forEach(({ key, label }) => {
-        const oldVal = oldS[key] as string || '';
-        const newVal = newS[key] as string || '';
-        if (oldVal !== newVal) {
-            changes.push(`${label} изменено с "${oldVal || 'пусто'}" на "${newVal || 'пусто'}"`);
+    fields.forEach(({ key, label }) => {
+        if ((oldS[key] || '') !== (newS[key] || '')) {
+            changes.push(`${label} изменено`);
         }
     });
-
-    const oldUsers = oldS.freeUsers || [];
-    const newUsers = newS.freeUsers || [];
-    
-    newUsers.forEach(newUser => {
-        const oldUser = oldUsers.find(u => u.id === newUser.id);
-        if (!oldUser) {
-            changes.push(`Добавлен пользователь: ${newUser.fullName}`);
-        } else {
-            const userChanges = [];
-            if (oldUser.fullName !== newUser.fullName) userChanges.push(`ФИО с "${oldUser.fullName}" на "${newUser.fullName}"`);
-            if ((oldUser.position || '') !== (newUser.position || '')) userChanges.push(`должность с "${oldUser.position || 'пусто'}" на "${newUser.position || 'пусто'}"`);
-            if ((oldUser.phone || '') !== (newUser.phone || '')) userChanges.push(`телефон с "${oldUser.phone || 'пусто'}" на "${newUser.phone || 'пусто'}"`);
-            if (userChanges.length > 0) {
-                changes.push(`Изменены данные пользователя ${newUser.fullName}: ${userChanges.join(', ')}`);
-            }
-        }
-    });
-    
-    oldUsers.forEach(oldUser => {
-        if (!newUsers.find(u => u.id === oldUser.id)) {
-            changes.push(`Удален пользователь: ${oldUser.fullName}`);
-        }
-    });
-
     return changes;
 };
 
@@ -126,22 +79,28 @@ const App: React.FC = () => {
   const [inventoryCount, setInventoryCount] = useLocalStorage<number>('inventoryCount', 20);
   const [users, setUsers] = useLocalStorage<User[]>('auth_users', []);
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('auth_currentUser', null);
+  const [notifications, setNotifications] = useLocalStorage<AppNotification[]>('app_notifications', []);
   
-  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isTeamOpen, setIsTeamOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>('Все');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState('Все');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStations, setSelectedStations] = useState<Set<string>>(new Set());
   const [view, setView] = useState<'app' | 'admin'>('app');
+
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const adminExists = users.some(u => u.role === UserRole.ADMIN);
     if (!adminExists) {
       const defaultAdmin: User = {
-        id: 'admin-' + new Date().toISOString(),
-        name: 'Администратор',
-        email: 'admin@example.com',
-        password: 'adminpassword',
+        id: 'admin-' + Date.now(),
+        name: 'Главный Администратор',
+        email: 'almaty808@gmail.com',
+        phone: '+7 (777) 808-88-88',
+        password: '123qweasdzxc',
         status: UserStatus.APPROVED,
         role: UserRole.ADMIN,
       };
@@ -149,351 +108,161 @@ const App: React.FC = () => {
     }
   }, [users, setUsers]);
 
+  const addNotification = (message: string, type: AppNotification['type'] = 'info') => {
+      const newNotif: AppNotification = {
+          id: Math.random().toString(36).substr(2, 9),
+          message,
+          timestamp: new Date().toISOString(),
+          author: currentUser?.name || 'Система',
+          read: false,
+          type
+      };
+      setNotifications(prev => [newNotif, ...prev].slice(0, 100));
+  };
 
   const handleSaveStation = (stationToSave: Station) => {
     const oldStation = stations.find(s => s.id === stationToSave.id);
     let newHistory: HistoryEntry[] = [...(stationToSave.history || [])];
 
     if (oldStation) { 
-      if (oldStation.status !== StationStatus.REMOVED && stationToSave.status === StationStatus.REMOVED) {
-        setInventoryCount(prev => prev + 1);
-      } else if (oldStation.status === StationStatus.REMOVED && stationToSave.status !== StationStatus.REMOVED) {
-        if (inventoryCount > 0) {
-          setInventoryCount(prev => prev - 1);
-        } else {
-          alert("Нет станций в остатке для повторной установки!");
-          stationToSave.status = StationStatus.REMOVED; 
-        }
-      }
-      
       const changes = diffStations(oldStation, stationToSave);
-      if (changes.length > 0) {
-          changes.forEach(change => {
-              newHistory.unshift(generateHistoryEntry(currentUser!.name, change));
-          });
-      }
-
+      changes.forEach(change => newHistory.unshift(generateHistoryEntry(currentUser!.name, change)));
       setStations(stations.map(s => s.id === stationToSave.id ? { ...stationToSave, history: newHistory } : s));
     } else { 
-      if (inventoryCount > 0) {
-        setInventoryCount(prev => prev - 1);
-        newHistory.unshift(generateHistoryEntry(currentUser!.name, "Станция создана"));
-        setStations([{ ...stationToSave, history: newHistory }, ...stations]);
-      } else {
-        alert("Нельзя добавить станцию: нет в наличии на складе.");
-        return;
-      }
+      setInventoryCount(prev => prev - 1);
+      newHistory.unshift(generateHistoryEntry(currentUser!.name, "Станция создана"));
+      setStations([{ ...stationToSave, history: newHistory }, ...stations]);
     }
-    closeForm();
-  };
-
-  const handleEdit = (station: Station) => {
-    setEditingStation(station);
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту станцию? Это действие изменит ее статус на "Удалено" и вернет на склад.')) {
-      handleStatusChange(id, StationStatus.REMOVED);
-    }
-  };
-  
-  const handleStatusChange = (id: string, status: StationStatus) => {
-    const oldStation = stations.find(s => s.id === id);
-    if (!oldStation || oldStation.status === status) return;
-
-    if (oldStation.status !== StationStatus.REMOVED && status === StationStatus.REMOVED) {
-        setInventoryCount(prev => prev + 1);
-    } else if (oldStation.status === StationStatus.REMOVED && status !== StationStatus.REMOVED) {
-        if (inventoryCount > 0) {
-            setInventoryCount(prev => prev - 1);
-        } else {
-            alert("Нет станций в остатке для повторной установки!");
-            return; 
-        }
-    }
-    
-    const newHistory = [
-      generateHistoryEntry(currentUser!.name, `Статус изменен с "${oldStation.status}" на "${status}"`),
-      ...oldStation.history
-    ];
-
-    setStations(stations.map(s => s.id === id ? { ...s, status, history: newHistory } : s));
-  };
-
-  const closeForm = () => {
     setIsFormOpen(false);
-    setEditingStation(null);
   };
 
-  const openForm = () => {
-    setEditingStation(null);
-    setIsFormOpen(true);
-  };
-  
+  const handleLogout = () => { setCurrentUser(null); setView('app'); };
+
   const displayedStations = useMemo(() => {
-    const normalizedQuery = searchQuery.toLowerCase().trim();
-
-    const statusFiltered = filterStatus === 'Все'
-      ? stations
-      : stations.filter(s => s.status === filterStatus);
-
-    if (!normalizedQuery) {
-      return statusFiltered;
+    let result = filterStatus === 'Все' ? stations : stations.filter(s => s.status === filterStatus);
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        result = result.filter(s => s.locationName.toLowerCase().includes(q) || s.address.toLowerCase().includes(q));
     }
-
-    return statusFiltered.filter(station => {
-      const queryDigits = normalizedQuery.replace(/\D/g, '');
-
-      const matchesLocation = station.locationName.toLowerCase().includes(normalizedQuery);
-      const matchesSid = station.sid?.toLowerCase().includes(normalizedQuery) ?? false;
-      const matchesDid = station.did?.toLowerCase().includes(normalizedQuery) ?? false;
-      const matchesSim = station.sim?.toLowerCase().includes(normalizedQuery) ?? false;
-      const matchesDate = new Date(station.installationDate).toLocaleDateString('ru-RU').includes(normalizedQuery);
-      const matchesUser = station.freeUsers?.some(user =>
-        user.fullName.toLowerCase().includes(normalizedQuery) ||
-        (user.phone && user.phone.replace(/\D/g, '').includes(queryDigits) && queryDigits.length > 0)
-      ) ?? false;
-
-      return matchesLocation || matchesSid || matchesDid || matchesSim || matchesDate || matchesUser;
-    });
+    return result;
   }, [stations, filterStatus, searchQuery]);
 
-  const handleToggleSelection = (id: string) => {
-    setSelectedStations(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  };
+  if (!currentUser) return <Auth onLogin={setCurrentUser} users={users} setUsers={setUsers} />;
 
-  const handleToggleSelectAll = () => {
-    const displayedIds = new Set(displayedStations.map(s => s.id));
-    const allDisplayedSelected = displayedStations.length > 0 && displayedStations.every(s => selectedStations.has(s.id));
-  
-    if (allDisplayedSelected) {
-      setSelectedStations(prev => {
-        const newSet = new Set(prev);
-        displayedIds.forEach(id => newSet.delete(id));
-        return newSet;
-      });
-    } else {
-      setSelectedStations(prev => {
-        const newSet = new Set(prev);
-        displayedIds.forEach(id => newSet.add(id));
-        return newSet;
-      });
-    }
-  };
+  const formatWhatsAppLink = (p: string) => `https://wa.me/${p.replace(/\D/g, '')}`;
 
-  const handleExport = (stationsToExport: Station[]) => {
-    if (stationsToExport.length === 0) {
-      alert("Нет станций для экспорта.");
-      return;
-    }
-
-    const headers = [
-      "ID", "Название местоположения", "Адрес", "Установщик", "Дата установки",
-      "Статус", "SID", "DID", "SIM", "Широта", "Долгота", "Заметки", "Бесплатные пользователи"
-    ];
-
-    const rows = stationsToExport.map(station => {
-      const freeUsersString = station.freeUsers?.map(user =>
-        `ФИО: ${user.fullName || ''}; Должность: ${user.position || ''}; Телефон: ${user.phone || ''}`
-      ).join(' | ') || '';
-
-      const escapeCSV = (field: string | number | null | undefined) => {
-        if (field === null || field === undefined) return '';
-        const str = String(field);
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-      };
-
-      return [
-        escapeCSV(station.id),
-        escapeCSV(station.locationName),
-        escapeCSV(station.address),
-        escapeCSV(station.installer),
-        escapeCSV(new Date(station.installationDate).toLocaleDateString('ru-RU')),
-        escapeCSV(station.status),
-        escapeCSV(station.sid),
-        escapeCSV(station.did),
-        escapeCSV(station.sim),
-        escapeCSV(station.coordinates?.lat),
-        escapeCSV(station.coordinates?.lng),
-        escapeCSV(station.notes),
-        escapeCSV(freeUsersString),
-      ].join(',');
-    });
-
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-
-    const url = URL.createObjectURL(blob);
-    const date = new Date().toISOString().split('T')[0];
-    link.setAttribute("href", url);
-    link.setAttribute("download", `stations_export_${date}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Auth handlers
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setView('app');
-  };
-
-  if (!currentUser) {
-    return <Auth onLogin={handleLogin} users={users} setUsers={setUsers} />;
-  }
-
-  if (currentUser.status === UserStatus.PENDING) {
-     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4">
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-lg text-center">
-            <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400 mb-4">Ожидание подтверждения</h1>
-            <p className="text-slate-600 dark:text-slate-300 mb-6">Ваша учетная запись ожидает подтверждения администратором. Пожалуйста, попробуйте войти позже.</p>
-            <button
-                onClick={handleLogout}
-                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
-            >
-                <LogoutIcon className="w-5 h-5" />
-                <span>Выйти</span>
-            </button>
-        </div>
-      </div>
-    );
-  }
-  
-  if (currentUser.role === UserRole.ADMIN && view === 'admin') {
-      return <AdminPanel users={users} setUsers={setUsers} onBack={() => setView('app')} />;
-  }
-  
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
       <header className="bg-white dark:bg-slate-800 shadow-md sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <h1 className="text-2xl font-bold text-primary-600 dark:text-primary-400">Учет Зарядных Станций</h1>
-          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 p-2 rounded-md bg-slate-100 dark:bg-slate-700">
-                <PackageIcon className="w-6 h-6 text-primary-500" />
-                <span>В остатке: {inventoryCount}</span>
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold text-primary-600 hidden sm:block">ChargeManager</h1>
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 p-2 rounded-lg flex items-center gap-2">
+                <PackageIcon className="w-4 h-4 text-primary-500" />
+                <span>Склад: {inventoryCount}</span>
             </div>
-             <div className="flex-grow sm:flex-grow-0 text-center sm:text-left">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {currentUser.name}
-                </span>
-             </div>
-             {currentUser.role === UserRole.ADMIN && (
-                 <button onClick={() => setView('admin')} className="p-2 text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors" title="Управление пользователями">
-                     <UsersIcon className="w-6 h-6" />
-                 </button>
-             )}
-             <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-500 transition-colors" title="Выйти">
-                <LogoutIcon className="w-6 h-6" />
+            
+            <button onClick={() => setIsTeamOpen(true)} className="p-2 text-slate-500 hover:text-primary-600 transition-colors" title="Команда">
+                <UsersIcon className="w-6 h-6" />
             </button>
-            <button
-              onClick={openForm}
-              disabled={inventoryCount <= 0}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed"
-              title={inventoryCount <= 0 ? "Нет станций в наличии" : "Добавить новую станцию"}
-            >
-              <PlusIcon className="w-5 h-5" />
-              <span className="hidden sm:inline">Добавить</span>
-            </button>
+
+            <div className="relative">
+                <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="p-2 text-slate-500 hover:text-primary-600 transition-colors relative">
+                    <BellIcon className="w-6 h-6" />
+                    {notifications.some(n => !n.read) && <span className="absolute top-1.5 right-1.5 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white" />}
+                </button>
+                {isNotifOpen && <NotificationCenter notifications={notifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} />}
+            </div>
+
+            {currentUser.role === UserRole.ADMIN && (
+                <button onClick={() => setView(view === 'admin' ? 'app' : 'admin')} className="p-2 text-primary-600 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                    {view === 'admin' ? <MapPinIcon className="w-6 h-6" /> : <CogIcon className="w-6 h-6" />}
+                </button>
+            )}
+
+            <button onClick={handleLogout} className="p-2 text-red-500"><LogoutIcon className="w-6 h-6" /></button>
+            
+            <button onClick={() => setIsFormOpen(true)} className="p-2 bg-primary-600 text-white rounded-lg"><PlusIcon className="w-6 h-6" /></button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="block w-full sm:w-auto text-sm rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200"
-              >
-                  <option value="Все">Все статусы</option>
-                  {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <div className="relative w-full sm:w-64">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <SearchIcon className="h-5 w-5 text-slate-400" />
+      {view === 'admin' && currentUser.role === UserRole.ADMIN ? (
+        <AdminPanel 
+            users={users} setUsers={setUsers} stations={stations} setStations={setStations}
+            inventoryCount={inventoryCount} setInventoryCount={setInventoryCount} notifications={notifications}
+            onEditStation={(s) => { setEditingStation(s); setIsFormOpen(true); }}
+            onDeleteStation={(id) => setStations(stations.filter(s => s.id !== id))}
+            onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))}
+            onAddStation={() => { setEditingStation(null); setIsFormOpen(true); }}
+            onBack={() => setView('app')}
+        />
+      ) : (
+        <main className="container mx-auto px-4 py-8">
+            <div className="mb-6 flex gap-4">
+                <input type="text" placeholder="Поиск станций..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700" />
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700">
+                    <option value="Все">Все статусы</option>
+                    {Object.values(StationStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+            </div>
+            <StationList stations={displayedStations} selectedStations={selectedStations} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={() => {}} onStatusChange={() => {}} onToggleSelection={() => {}} />
+        </main>
+      )}
+
+      {/* Team Modal */}
+      {isTeamOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-primary-600 text-white">
+                      <div>
+                        <h2 className="text-xl font-bold">Наша Команда</h2>
+                        <p className="text-xs opacity-80">Список всех активных сотрудников</p>
+                      </div>
+                      <button onClick={() => setIsTeamOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">✕</button>
                   </div>
-                  <input
-                      type="search"
-                      placeholder="Поиск..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="block w-full rounded-md border-slate-300 dark:border-slate-600 py-2 pl-10 pr-3 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-200"
-                  />
+                  <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
+                      {users.filter(u => u.status === UserStatus.APPROVED).map(user => (
+                          <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-600 gap-4">
+                              <div className="flex items-center gap-4">
+                                  <div className="h-12 w-12 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-lg">
+                                      {user.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                      <h4 className="font-bold text-slate-900 dark:text-slate-100">{user.name}</h4>
+                                      <p className="text-xs text-slate-500">{user.role}</p>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                  <div className="text-right hidden sm:block">
+                                      <p className="text-sm font-bold">{user.phone}</p>
+                                      <p className="text-[10px] text-slate-400">{user.email}</p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <a href={`tel:${user.phone}`} className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-primary-600 border border-slate-200 dark:border-slate-600">
+                                          <PhoneIcon className="w-5 h-5" />
+                                      </a>
+                                      <a href={formatWhatsAppLink(user.phone)} target="_blank" rel="noopener noreferrer" className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-green-500 border border-slate-200 dark:border-slate-600">
+                                          <WhatsAppIcon className="w-5 h-5" />
+                                      </a>
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/50 text-center">
+                      <button onClick={() => setIsTeamOpen(false)} className="text-sm font-bold text-slate-500 hover:text-slate-800">Закрыть</button>
+                  </div>
               </div>
           </div>
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-3">
-              <input 
-                type="checkbox"
-                id="selectAll"
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
-                checked={displayedStations.length > 0 && displayedStations.every(s => selectedStations.has(s.id))}
-                onChange={handleToggleSelectAll}
-                disabled={displayedStations.length === 0}
-              />
-              <label htmlFor="selectAll" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                Выбрать все на странице ({displayedStations.length})
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleExport(displayedStations)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={displayedStations.length === 0}
-              >
-                <DownloadIcon className="w-4 h-4" />
-                Выгрузить отфильтрованные
-              </button>
-              {selectedStations.size > 0 && (
-                <button
-                  onClick={() => handleExport(stations.filter(s => selectedStations.has(s.id)))}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-100 text-primary-700 rounded-md hover:bg-primary-200 dark:bg-primary-900/50 dark:text-primary-300 dark:hover:bg-primary-900/80 transition-colors"
-                >
-                  <DownloadIcon className="w-4 h-4" />
-                  Выгрузить выбранные ({selectedStations.size})
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <StationList
-          stations={displayedStations}
-          selectedStations={selectedStations}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onStatusChange={handleStatusChange}
-          onToggleSelection={handleToggleSelection}
-        />
-      </main>
+      )}
 
       {isFormOpen && (
         <StationForm
           station={editingStation}
           currentUserName={currentUser.name}
           onSave={handleSaveStation}
-          onClose={closeForm}
+          onClose={() => setIsFormOpen(false)}
         />
       )}
     </div>

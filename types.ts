@@ -1,3 +1,4 @@
+
 export enum StationStatus {
   PLANNED = 'Запланировано',
   INSTALLED = 'Установлено',
@@ -49,7 +50,17 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone: string; // New field
   password: string; // Should be hashed in a real app
   status: UserStatus;
   role: UserRole;
+}
+
+export interface AppNotification {
+  id: string;
+  message: string;
+  timestamp: string;
+  author: string;
+  read: boolean;
+  type: 'info' | 'success' | 'warning' | 'danger';
 }
