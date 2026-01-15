@@ -3,7 +3,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Station, StationStatus, HistoryEntry, User, UserStatus, UserRole, AppNotification, UserGroup, AppPermission } from './types';
 import StationList from './components/StationList';
 import StationForm from './components/StationForm';
-// Added EnvelopeIcon to the icons import list
 import { PlusIcon, SearchIcon, UsersIcon, LogoutIcon, BellIcon, MapPinIcon, CogIcon, ChartPieIcon, PhoneIcon, ClockIcon, CheckIcon, EnvelopeIcon } from './components/Icons';
 import useLocalStorage from './hooks/useLocalStorage';
 import Auth from './components/Auth';
@@ -193,7 +192,6 @@ const App: React.FC = () => {
                   </div>
               </div>
 
-              {/* Показывать новых сотрудников в списке команды для админа */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {users.map(user => {
                       const isPending = user.status === UserStatus.PENDING;
@@ -280,7 +278,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors duration-500">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 bg-white dark:bg-slate-900 border-r border-slate-200/50 dark:border-slate-800/50 h-screen sticky top-0 z-40">
         <div className="p-8 pb-10 flex items-center gap-4">
            <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary-500/30">
@@ -329,27 +326,6 @@ const App: React.FC = () => {
               <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="hidden lg:flex px-6 py-4 bg-primary-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Новый объект</button>
             </div>
         </header>
-        
-        {/* Global Admin Banner for Pending Requests */}
-        {isAdmin && pendingUsersCount > 0 && view !== 'admin' && (
-          <div 
-            onClick={() => setView('admin')}
-            className="mx-4 md:mx-10 mt-6 p-4 md:p-6 bg-rose-600 text-white rounded-[2rem] shadow-xl shadow-rose-500/20 flex items-center justify-between cursor-pointer hover:bg-rose-700 transition-all border border-rose-400/30 animate-scale-in"
-          >
-            <div className="flex items-center gap-4 md:gap-6">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-                 <UsersIcon className="w-6 h-6 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="font-black text-sm md:text-lg tracking-tight leading-none">Новые сотрудники ждут подтверждения</h4>
-                <p className="text-[10px] md:text-xs font-bold opacity-80 mt-1">Всего {pendingUsersCount} необработанных {pendingUsersCount === 1 ? 'заявка' : 'заявок'}. Нажмите, чтобы открыть панель.</p>
-              </div>
-            </div>
-            <div className="bg-white/20 p-2 md:p-3 rounded-xl">
-               <CheckIcon className="w-4 h-4 md:w-5 md:h-5" />
-            </div>
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {renderMainContent()}

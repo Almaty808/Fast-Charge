@@ -68,7 +68,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // User Management State
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState({ name: '', email: '', phone: '', password: '', role: UserRole.USER, groupId: '' });
+    const [userData, setUserData] = useState({ name: '', email: '', phone: '', password: '', role: UserRole.INSTALLER, groupId: '' });
 
     // Inventory Enhanced State
     const [inventoryItems, setInventoryItems] = useLocalStorage<InventoryItem[]>('app_inventory_items', [
@@ -85,11 +85,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // Invite Modal State
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
-
-    // Group Form State
-    const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
-    const [editingGroup, setEditingGroup] = useState<UserGroup | null>(null);
-    const [groupData, setGroupData] = useState({ name: '', description: '', permissions: [] as AppPermission[] });
 
     const pendingUsers = useMemo(() => users.filter(u => u.status === UserStatus.PENDING), [users]);
     const activeUsers = useMemo(() => users.filter(u => u.status === UserStatus.APPROVED), [users]);
@@ -186,7 +181,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     const handleSaveUser = () => {
-        // Нормализация перед сохранением критически важна
         const normalizedEmail = userData.email.toLowerCase().trim();
         const cleanPassword = userData.password.trim();
 
@@ -204,7 +198,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             } : u));
             onSendMessage(`Ваш профиль был обновлен администратором.`, 'info', editingUser.id);
         } else {
-            // Проверка на дубликаты
             if (users.some(u => u.email.toLowerCase().trim() === normalizedEmail)) {
                 alert('Пользователь с таким Email уже существует!');
                 return;
@@ -215,7 +208,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 ...userData,
                 email: normalizedEmail,
                 password: cleanPassword,
-                status: UserStatus.APPROVED // Созданные админом сразу активны
+                status: UserStatus.APPROVED 
             };
             setUsers(prev => [...prev, newUser]);
             onSendMessage(`Администратор добавил нового сотрудника: ${newUser.name}`, 'success', '');
@@ -235,10 +228,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const menuItems: AdminMenuItem[] = [
         { id: 'dashboard', label: 'Панель управления', icon: ChartIcon },
         { id: 'stations', label: 'Все объекты', icon: MapPinIcon },
-        { id: 'tasks', label: 'Задачи команды', icon: CheckIcon },
         { id: 'users', label: 'Сотрудники', icon: UsersIcon, badge: stats.pendingCount > 0 },
         { id: 'inventory', label: 'Склад и запасы', icon: PackageIcon },
-        { id: 'groups', label: 'Группы доступа', icon: CogIcon },
         { id: 'logs', label: 'Журнал событий', icon: HistoryIcon },
     ];
 
@@ -305,115 +296,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     );
                 })}
             </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white">История движения ТМЦ</h3>
-                    <button className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400"><DownloadIcon className="w-5 h-5" /></button>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                <th className="px-8 py-5">Товар</th>
-                                <th className="px-8 py-5">Изменение</th>
-                                <th className="px-8 py-5">Ответственный</th>
-                                <th className="px-8 py-5">Дата и время</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                            {stockLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-slate-50/30 transition-colors">
-                                    <td className="px-8 py-5 text-sm font-bold text-slate-800 dark:text-slate-200">{log.itemName}</td>
-                                    <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${log.change > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{log.change > 0 ? '+' : ''}{log.change}</span></td>
-                                    <td className="px-8 py-5 text-xs text-slate-500 font-medium">{log.author}</td>
-                                    <td className="px-8 py-5 text-xs text-slate-400">{new Date(log.timestamp).toLocaleString([], {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</td>
-                                </tr>
-                            ))}
-                            {stockLogs.length === 0 && (<tr><td colSpan={4} className="px-8 py-12 text-center text-slate-400 italic">Складских операций пока не проводилось</td></tr>)}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderDashboard = () => (
-        <div className="space-y-6">
-            {pendingUsers.length > 0 && (
-                <div className="bg-rose-600 rounded-[2.5rem] p-8 md:p-10 text-white shadow-[0_20px_50px_rgba(225,29,72,0.3)] animate-scale-in border-4 border-rose-500/50">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div className="flex items-center gap-6">
-                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-[1.75rem] flex items-center justify-center animate-bounce shadow-inner shrink-0">
-                                <UsersIcon className="w-8 h-8 md:w-10 md:h-10 text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Обнаружены заявки!</h3>
-                                <p className="text-rose-100 font-bold max-w-sm leading-relaxed text-sm md:text-base">{pendingUsers.length} {pendingUsers.length === 1 ? 'сотрудник ожидает' : 'сотрудника ожидают'} подтверждения регистрации.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4 w-full md:w-auto">
-                            <button onClick={() => setActiveTab('users')} className="flex-1 md:flex-none px-10 py-5 bg-white text-rose-600 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-rose-50 active:scale-95 transition-all">Перейти в список</button>
-                        </div>
-                    </div>
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                         {pendingUsers.slice(0, 4).map(u => (
-                             <div key={u.id} className="p-5 bg-white/10 rounded-3xl backdrop-blur-sm border border-white/10 flex items-center justify-between gap-4">
-                                <div className="min-w-0"><p className="font-black text-sm truncate">{u.name}</p><p className="text-[10px] opacity-70 truncate">{u.email}</p></div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleApprove(u.id)} className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-all"><CheckIcon className="w-5 h-5"/></button>
-                                    <button onClick={() => { if(confirm('Отклонить?')) setUsers(prev => prev.filter(p => p.id !== u.id)) }} className="w-10 h-10 bg-white/20 text-white rounded-xl flex items-center justify-center hover:bg-rose-700 transition-all"><TrashIcon className="w-5 h-5"/></button>
-                                </div>
-                             </div>
-                         ))}
-                    </div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                    { label: 'Всего объектов', val: stats.total, icon: MapPinIcon, col: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/20' },
-                    { label: 'Установлено', val: stats.installed, icon: CheckIcon, col: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-                    { label: 'Запас на складе', val: inventoryCount, icon: PackageIcon, col: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-                    { label: 'Новые заявки', val: stats.pendingCount, icon: UsersIcon, col: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', pulse: stats.pendingCount > 0 },
-                ].map((s, idx) => (
-                    <div key={idx} className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm transition-transform hover:scale-[1.02]">
-                        <div className={`w-12 h-12 rounded-2xl ${s.bg} flex items-center justify-center mb-4 shadow-sm ${s.pulse ? 'animate-pulse' : ''}`}><s.icon className={`w-6 h-6 ${s.col}`} /></div>
-                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                        <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{s.val}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
-                        <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-black text-slate-900 dark:text-white">Последние уведомления</h3><button className="text-xs font-bold text-primary-600 hover:underline">Все события</button></div>
-                        <div className="space-y-6">
-                            {notifications.length > 0 ? (
-                              notifications.slice(0, 8).map(n => (
-                                <div key={n.id} className="flex gap-4 items-start group">
-                                    <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${n.type === 'success' ? 'bg-emerald-50 text-emerald-600' : n.type === 'assignment' ? 'bg-primary-50 text-primary-600' : n.type === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500'}`}>
-                                        {n.type === 'warning' ? <BellIcon className="w-5 h-5 animate-pulse" /> : (n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />)}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-sm text-slate-800 dark:text-slate-200 font-bold group-hover:text-primary-600 transition-colors leading-tight">{n.message}</p>
-                                        <div className="flex items-center gap-2 mt-1.5"><span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{n.author}</span><span className="text-[10px] text-slate-400">• {new Date(n.timestamp).toLocaleString([], {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}</span></div>
-                                    </div>
-                                </div>
-                              ))
-                            ) : (<div className="py-10 text-center text-slate-400">Нет новых событий</div>)}
-                        </div>
-                    </div>
-                </div>
-                <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary-500/20">
-                        <h4 className="text-lg font-black mb-2 tracking-tight">Инвайт-система</h4>
-                        <p className="text-xs opacity-80 mb-6 font-medium text-indigo-50 leading-relaxed">Создайте персональную ссылку для регистрации нового сотрудника.</p>
-                        <button onClick={() => setIsInviteModalOpen(true)} className="w-full py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95 flex items-center justify-center gap-2"><EnvelopeIcon className="w-4 h-4" /> Пригласить по Email</button>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 
@@ -448,7 +330,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className="flex-1 text-center md:text-left min-w-0">
                                         <h4 className="text-xl font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
                                         <p className="text-sm text-slate-500 font-medium mb-2 truncate">{u.email} • {u.phone}</p>
-                                        <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg">Новый сотрудник</span>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
                                         <button onClick={() => handleApprove(u.id)} className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">Одобрить</button>
@@ -512,19 +393,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     ))}
                 </div></div>
             <main className="flex-1 md:ml-72 min-h-screen"><div className="max-w-6xl mx-auto p-6 md:p-12 pb-32">
-                    <div className="hidden md:flex justify-between items-center mb-12"><div><h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{menuItems.find(i => i.id === activeTab)?.label}</h2><p className="text-slate-500 font-medium mt-1">Центральный хаб управления ресурсами предприятия.</p></div></div>
-                    {activeTab === 'dashboard' && renderDashboard()}
-                    {activeTab === 'inventory' && renderInventory()}
-                    {activeTab === 'stations' && (
-                        <div className="space-y-6">
-                            <div className="flex flex-col md:flex-row gap-4 items-center justify-between"><div className="relative w-full md:w-96"><SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" /><input value={stationSearch} onChange={e => setStationSearch(e.target.value)} placeholder="Поиск по реестру..." className="w-full pl-12 pr-6 py-5 bg-white dark:bg-slate-800 rounded-3xl border-none shadow-sm text-sm" /></div><button onClick={onAddStation} className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"><PlusIcon className="w-5 h-5" /> Добавить объект</button></div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {stations.filter(s => s.locationName.toLowerCase().includes(stationSearch.toLowerCase())).map(s => (
-                                    <div key={s.id} className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-sm group hover:shadow-lg transition-all"><div className="flex items-center gap-5 min-w-0"><div className="w-16 h-16 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0"><MapPinIcon className="w-8 h-8 text-primary-500" /></div><div className="min-w-0"><h4 className="text-lg font-black text-slate-900 dark:text-white truncate">{s.locationName}</h4><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 truncate">{s.status} • {s.address}</p></div></div><button onClick={() => onEditStation(s)} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-sm"><EditIcon className="w-6 h-6" /></button></div>
-                                ))}
-                            </div>
+                    {activeTab === 'dashboard' && <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[
+                                { label: 'Всего объектов', val: stats.total, icon: MapPinIcon, col: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/20' },
+                                { label: 'Установлено', val: stats.installed, icon: CheckIcon, col: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+                                { label: 'Запас на складе', val: inventoryCount, icon: PackageIcon, col: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                                { label: 'Новые заявки', val: stats.pendingCount, icon: UsersIcon, col: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', pulse: stats.pendingCount > 0 },
+                            ].map((s, idx) => (
+                                <div key={idx} className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm transition-transform hover:scale-[1.02]">
+                                    <div className={`w-12 h-12 rounded-2xl ${s.bg} flex items-center justify-center mb-4 shadow-sm ${s.pulse ? 'animate-pulse' : ''}`}><s.icon className={`w-6 h-6 ${s.col}`} /></div>
+                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                                    <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{s.val}</p>
+                                </div>
+                            ))}
                         </div>
-                    )}
+                    </div>}
+                    {activeTab === 'inventory' && renderInventory()}
                     {activeTab === 'users' && renderUsers()}
                 </div></main>
 
@@ -551,16 +436,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     ))}
                                 </div>
                             </div>
-                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Группа доступа</label><select value={userData.groupId} onChange={e => setUserData({...userData, groupId: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-xs uppercase tracking-widest text-slate-700 dark:text-slate-200"><option value="">Без группы</option>{userGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
                         </div>
                         <div className="p-10 border-t border-slate-100 dark:border-slate-800"><button onClick={handleSaveUser} className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all">{editingUser ? 'Сохранить изменения' : 'Создать и активировать аккаунт'}</button></div>
                     </div>
                 </div>
-            )}
-
-            {/* Invite User Modal */}
-            {isInviteModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[130] flex items-center justify-center p-6"><div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl p-10 animate-slide-up"><div className="flex justify-between items-center mb-8"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center"><EnvelopeIcon className="w-6 h-6" /></div><h3 className="text-2xl font-black text-slate-900 dark:text-white">Приглашение</h3></div><button onClick={() => setIsInviteModalOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors">✕</button></div><p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">Введите Email сотрудника. Мы создадим специальную ссылку, по которой он сможет зарегистрироваться.</p><form onSubmit={handleGenerateInvite} className="space-y-6"><input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="example@fastcharge.com" className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /><button type="submit" className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all">Сгенерировать ссылку</button></form></div></div>
             )}
         </div>
     );

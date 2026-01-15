@@ -36,20 +36,29 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
         e.preventDefault();
         setError('');
         
-        // Нормализуем ввод для точного сравнения
         const searchEmail = email.toLowerCase().trim();
         const searchPassword = password.trim();
 
         const user = users.find(u => 
-            u.email.toLowerCase().trim() === searchEmail && 
-            u.password === searchPassword
+            u.email.toLowerCase().trim() === searchEmail
         );
 
-        if (user) {
-            onLogin(user);
-        } else {
-            setError('Неверные учетные данные. Проверьте Email и пароль. Помните, что пароль чувствителен к регистру.');
+        if (!user) {
+            setError('Пользователь с таким Email не найден.');
+            return;
         }
+
+        if (user.password !== searchPassword) {
+            setError('Неверный пароль. Пожалуйста, проверьте раскладку и регистр.');
+            return;
+        }
+
+        if (user.status === UserStatus.PENDING) {
+            setError('Ваш аккаунт еще не подтвержден администратором.');
+            return;
+        }
+
+        onLogin(user);
     };
 
     const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -67,7 +76,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
             name: name.trim(),
             email: normalizedEmail,
             phone: phone.trim(),
-            password: password, // Пароли не нормализуем, сохраняем как есть
+            password: password,
             status: UserStatus.PENDING,
             role: UserRole.USER,
         };
