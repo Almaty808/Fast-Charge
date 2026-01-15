@@ -17,7 +17,8 @@ import {
     BellIcon,
     EnvelopeIcon,
     HistoryIcon,
-    DownloadIcon
+    DownloadIcon,
+    PlusIcon as InviteIcon
 } from './Icons';
 import StatusBadge from './StatusBadge';
 
@@ -57,6 +58,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [userSearch, setUserSearch] = useState('');
     const [msgModal, setMsgModal] = useState<{ userId: string, type: 'push' | 'email' } | null>(null);
     const [msgBody, setMsgBody] = useState('');
+    const [showInviteToast, setShowInviteToast] = useState(false);
     
     // Group Form State
     const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
@@ -75,6 +77,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleApprove = (userId: string) => {
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: UserStatus.APPROVED } : u));
+        onSendMessage('Ваш аккаунт подтвержден! Добро пожаловать в команду.', 'success', userId);
+    };
+
+    const handleReject = (userId: string) => {
+        if (confirm('Вы уверены, что хотите отклонить эту заявку? Пользователь будет удален.')) {
+            setUsers(prev => prev.filter(u => u.id !== userId));
+        }
+    };
+
+    const handleInvite = () => {
+        const url = window.location.origin;
+        navigator.clipboard.writeText(url).then(() => {
+            setShowInviteToast(true);
+            setTimeout(() => setShowInviteToast(false), 3000);
+        });
     };
 
     const handleSend = () => {
@@ -121,6 +138,48 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const renderDashboard = () => (
         <div className="space-y-6">
+            {/* ПРИОРИТЕТНЫЙ БЛОК: НОВЫЕ ЗАЯВКИ */}
+            {pendingUsers.length > 0 && (
+                <div className="bg-rose-600 rounded-[2.5rem] p-8 md:p-10 text-white shadow-[0_20px_50px_rgba(225,29,72,0.3)] animate-slide-up border-4 border-rose-500/50">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-[1.75rem] flex items-center justify-center animate-bounce shadow-inner shrink-0">
+                                <UsersIcon className="w-8 h-8 md:w-10 md:h-10 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Новые заявки!</h3>
+                                <p className="text-rose-100 font-bold max-w-sm leading-relaxed text-sm md:text-base">
+                                    {pendingUsers.length} {pendingUsers.length === 1 ? 'сотрудник ожидает' : 'сотрудника ожидают'} подтверждения регистрации.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 w-full md:w-auto">
+                            <button 
+                                onClick={() => setActiveTab('users')}
+                                className="flex-1 md:flex-none px-10 py-5 bg-white text-rose-600 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-rose-50 active:scale-95 transition-all"
+                            >
+                                Посмотреть всех
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {pendingUsers.slice(0, 4).map(u => (
+                             <div key={u.id} className="p-5 bg-white/10 rounded-3xl backdrop-blur-sm border border-white/10 flex items-center justify-between gap-4">
+                                <div className="min-w-0">
+                                    <p className="font-black text-sm truncate">{u.name}</p>
+                                    <p className="text-[10px] opacity-70 truncate">{u.email}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleApprove(u.id)} className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-all"><CheckIcon className="w-5 h-5"/></button>
+                                    <button onClick={() => handleReject(u.id)} className="w-10 h-10 bg-white/20 text-white rounded-xl flex items-center justify-center hover:bg-rose-700 transition-all"><TrashIcon className="w-5 h-5"/></button>
+                                </div>
+                             </div>
+                         ))}
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                     { label: 'Всего объектов', val: stats.total, icon: MapPinIcon, col: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/20' },
@@ -140,34 +199,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    {pendingUsers.length > 0 && (
-                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border-2 border-rose-100 dark:border-rose-900/30 p-8 shadow-xl shadow-rose-500/5">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                    <ClockIcon className="w-5 h-5 text-rose-500" />
-                                    Ожидают подтверждения ({pendingUsers.length})
-                                </h3>
-                                <button onClick={() => setActiveTab('users')} className="text-xs font-bold text-primary-600 hover:underline">Все сотрудники</button>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {pendingUsers.map(u => (
-                                    <div key={u.id} className="p-4 bg-rose-50/50 dark:bg-rose-950/10 rounded-2xl flex items-center justify-between gap-4 border border-rose-100/50 dark:border-rose-900/20">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-black text-slate-900 dark:text-white truncate">{u.name}</p>
-                                            <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
-                                        </div>
-                                        <button 
-                                            onClick={() => handleApprove(u.id)}
-                                            className="px-4 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-colors shadow-lg shadow-rose-500/20"
-                                        >
-                                            Одобрить
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-lg font-black text-slate-900 dark:text-white">Последние уведомления</h3>
@@ -183,7 +214,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         n.type === 'warning' ? 'bg-amber-50 text-amber-600' :
                                         'bg-slate-50 text-slate-500'
                                     }`}>
-                                        {n.type === 'warning' ? <BellIcon className="w-5 h-5" /> : (n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />)}
+                                        {n.type === 'warning' ? <BellIcon className="w-5 h-5 animate-pulse" /> : (n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />)}
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm text-slate-800 dark:text-slate-200 font-bold group-hover:text-primary-600 transition-colors leading-tight">{n.message}</p>
@@ -203,9 +234,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <div className="space-y-6">
                     <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2rem] p-8 text-white shadow-xl shadow-primary-500/20">
-                        <h4 className="text-lg font-black mb-2 tracking-tight">Быстрое действие</h4>
-                        <p className="text-sm opacity-80 mb-6 font-medium">Создайте новый объект установки за несколько секунд.</p>
-                        <button onClick={onAddStation} className="w-full py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-colors active:scale-95">Добавить станцию</button>
+                        <h4 className="text-lg font-black mb-2 tracking-tight">Инвайт-ссылка</h4>
+                        <p className="text-xs opacity-80 mb-6 font-medium">Отправьте эту ссылку новому сотруднику для регистрации.</p>
+                        <button 
+                            onClick={handleInvite} 
+                            className="w-full py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            Копировать ссылку
+                        </button>
+                        {showInviteToast && <p className="text-[10px] font-black text-center mt-3 animate-fade-in">Ссылка скопирована!</p>}
                     </div>
                     
                     <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
@@ -221,7 +258,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-slate-500 font-bold">Версия</span>
-                                <span className="text-slate-400 font-black">2.4.0-web</span>
+                                <span className="text-slate-400 font-black">2.5.2-pro</span>
                             </div>
                         </div>
                     </div>
@@ -236,42 +273,50 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         return (
             <div className="space-y-12">
-                <div className="relative max-w-md mb-8">
-                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input 
-                        value={userSearch} 
-                        onChange={e => setUserSearch(e.target.value)} 
-                        placeholder="Поиск по имени или email..." 
-                        className="w-full pl-12 pr-6 py-4 bg-white dark:bg-slate-800 rounded-2xl border-none shadow-sm text-sm"
-                    />
+                <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+                    <div className="relative w-full md:w-96">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <input 
+                            value={userSearch} 
+                            onChange={e => setUserSearch(e.target.value)} 
+                            placeholder="Поиск по сотрудникам..." 
+                            className="w-full pl-12 pr-6 py-5 bg-white dark:bg-slate-800 rounded-3xl border-none shadow-sm text-sm focus:ring-4 focus:ring-primary-500/10 transition-all"
+                        />
+                    </div>
+                    <button 
+                        onClick={handleInvite}
+                        className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3"
+                    >
+                        <PlusIcon className="w-5 h-5" /> Пригласить сотрудника
+                    </button>
                 </div>
 
                 {filteredPending.length > 0 && (
                     <div className="space-y-6">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 ml-2">
                             <div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Заявки на регистрацию ({filteredPending.length})</h3>
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Заявки на подтверждение ({filteredPending.length})</h3>
                         </div>
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                             {filteredPending.map(u => (
-                                <div key={u.id} className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-xl shadow-rose-500/5 flex flex-col md:flex-row gap-6 items-center">
+                                <div key={u.id} className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-xl shadow-rose-500/5 flex flex-col md:flex-row gap-6 items-center animate-scale-in">
                                     <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 font-black text-3xl shrink-0">
                                         {u.name.charAt(0)}
                                     </div>
                                     <div className="flex-1 text-center md:text-left">
                                         <h4 className="text-xl font-black text-slate-900 dark:text-white">{u.name}</h4>
                                         <p className="text-sm text-slate-500 font-medium mb-2">{u.email} • {u.phone}</p>
-                                        <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg">Новый участник</span>
+                                        <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg">Новый сотрудник</span>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
                                         <button 
                                             onClick={() => handleApprove(u.id)}
                                             className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
                                         >
-                                            Активировать
+                                            Одобрить
                                         </button>
                                         <button 
-                                            onClick={() => { if(confirm('Удалить заявку?')) setUsers(us => us.filter(x => x.id !== u.id)) }}
+                                            onClick={() => handleReject(u.id)}
                                             className="p-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"
                                         >
                                             <TrashIcon className="w-6 h-6" />
@@ -284,7 +329,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
 
                 <div className="space-y-6">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Активный штат ({activeUsers.length})</h3>
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2">Активная команда ({activeUsers.length})</h3>
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         {filteredActive.map(u => (
                             <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
@@ -510,7 +555,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
                                 {menuItems.find(i => i.id === activeTab)?.label}
                             </h2>
-                            <p className="text-slate-500 font-medium mt-1">Добро пожаловать в центр управления ресурсами.</p>
+                            <p className="text-slate-500 font-medium mt-1">Центральный хаб управления ресурсами предприятия.</p>
                         </div>
                     </div>
 
@@ -520,22 +565,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                                 <div className="relative w-full md:w-96">
                                     <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                    <input value={stationSearch} onChange={e => setStationSearch(e.target.value)} placeholder="Поиск объектов в реестре..." className="w-full pl-12 pr-6 py-4 bg-white dark:bg-slate-800 rounded-2xl border-none shadow-sm text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" />
+                                    <input value={stationSearch} onChange={e => setStationSearch(e.target.value)} placeholder="Поиск по реестру..." className="w-full pl-12 pr-6 py-5 bg-white dark:bg-slate-800 rounded-3xl border-none shadow-sm text-sm" />
                                 </div>
-                                <button onClick={onAddStation} className="w-full md:w-auto px-8 py-4 bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all flex items-center justify-center gap-2">
-                                    <PlusIcon className="w-5 h-5" /> Добавить станцию
+                                <button onClick={onAddStation} className="w-full md:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                                    <PlusIcon className="w-5 h-5" /> Добавить объект
                                 </button>
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 {stations.filter(s => s.locationName.toLowerCase().includes(stationSearch.toLowerCase())).map(s => (
-                                    <div key={s.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 flex justify-between items-center shadow-sm group hover:shadow-lg transition-all">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-slate-700 flex items-center justify-center">
-                                                <MapPinIcon className="w-7 h-7 text-primary-500" />
+                                    <div key={s.id} className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 flex justify-between items-center shadow-sm group hover:shadow-lg transition-all">
+                                        <div className="flex items-center gap-5 min-w-0">
+                                            <div className="w-16 h-16 rounded-[1.25rem] bg-slate-50 dark:bg-slate-700 flex items-center justify-center shrink-0">
+                                                <MapPinIcon className="w-8 h-8 text-primary-500" />
                                             </div>
-                                            <div>
-                                                <h4 className="text-base font-black text-slate-900 dark:text-white group-hover:text-primary-600 transition-colors">{s.locationName}</h4>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{s.status} • {s.address}</p>
+                                            <div className="min-w-0">
+                                                <h4 className="text-lg font-black text-slate-900 dark:text-white truncate">{s.locationName}</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 truncate">{s.status} • {s.address}</p>
                                             </div>
                                         </div>
                                         <button onClick={() => onEditStation(s)} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-primary-600 hover:bg-primary-600 hover:text-white transition-all shadow-sm"><EditIcon className="w-6 h-6" /></button>
@@ -668,7 +713,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {msgModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
-                    <div className="bg-white dark:bg-slate-900 w-full max-sm rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
                         <div className="flex items-center gap-4 mb-2">
                             <div className="p-3 bg-primary-50 text-primary-600 rounded-xl">
                                 {msgModal.type === 'push' ? <BellIcon className="w-6 h-6" /> : <EnvelopeIcon className="w-6 h-6" />}

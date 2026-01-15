@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<AppView>('app');
 
   const pendingUsersCount = useMemo(() => users.filter(u => u.status === UserStatus.PENDING).length, [users]);
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
     const masterEmail = 'almaty808@gmail.com';
@@ -134,14 +135,14 @@ const App: React.FC = () => {
   }, [stations, filterStatus, searchQuery]);
 
   const userNotifications = useMemo(() => {
-      return notifications.filter(n => !n.targetUserId || n.targetUserId === currentUser?.id || currentUser?.role === UserRole.ADMIN);
-  }, [notifications, currentUser]);
+      return notifications.filter(n => !n.targetUserId || n.targetUserId === currentUser?.id || isAdmin);
+  }, [notifications, currentUser, isAdmin]);
 
   const navItems: NavItem[] = [
     { id: 'app', label: 'Объекты', icon: MapPinIcon },
     { id: 'stats', label: 'Аналитика', icon: ChartPieIcon },
     { id: 'team', label: 'Команда', icon: UsersIcon },
-    ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon, badge: pendingUsersCount > 0 }] : [])
+    ...(isAdmin ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon, badge: pendingUsersCount > 0 }] : [])
   ];
 
   const renderMainContent = () => {
@@ -149,7 +150,7 @@ const App: React.FC = () => {
 
     switch (view) {
       case 'admin':
-        return currentUser.role === UserRole.ADMIN ? (
+        return isAdmin ? (
           <AdminPanel 
             users={users} setUsers={setUsers} stations={stations} setStations={setStations}
             userGroups={userGroups} setUserGroups={setUserGroups}
@@ -170,7 +171,7 @@ const App: React.FC = () => {
       case 'stats':
         return (
           <main className="container mx-auto px-4 lg:px-12 py-12">
-            <NetworkSummary stations={stations} allUsers={users} isAdmin={currentUser.role === UserRole.ADMIN} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} />
+            <NetworkSummary stations={stations} allUsers={users} isAdmin={isAdmin} onEdit={(s) => { setEditingStation(s); setIsFormOpen(true); }} onDelete={(id) => { if(confirm('Удалить объект?')) setStations(stations.filter(s => s.id !== id)); }} onStatusChange={(id, st) => setStations(stations.map(s => s.id === id ? {...s, status: st} : s))} />
           </main>
         );
 
@@ -204,6 +205,25 @@ const App: React.FC = () => {
       default:
         return (
           <main className="container mx-auto px-4 lg:px-12 py-12 animate-slide-up">
+              {/* Alert for Pending Users (Only for Admins) */}
+              {isAdmin && pendingUsersCount > 0 && (
+                <div 
+                  onClick={() => setView('admin')}
+                  className="mb-8 p-6 bg-rose-500 text-white rounded-[2.5rem] shadow-2xl shadow-rose-500/30 flex items-center justify-between cursor-pointer group hover:bg-rose-600 transition-all border-4 border-rose-400/20 animate-pulse"
+                >
+                  <div className="flex items-center gap-6">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                       <ClockIcon className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xl tracking-tight">Требуется подтверждение!</h4>
+                      <p className="text-sm font-bold opacity-80">У вас {pendingUsersCount} новых заявок от сотрудников.</p>
+                    </div>
+                  </div>
+                  <button className="px-6 py-3 bg-white text-rose-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg group-hover:scale-110 transition-transform">Перейти</button>
+                </div>
+              )}
+
               <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
                   <div>
                     <h2 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter">Сеть объектов</h2>
@@ -279,9 +299,11 @@ const App: React.FC = () => {
             </div>
             <div className="flex items-center gap-4 ml-4">
               <div className="relative">
-                  <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500">
-                      <BellIcon className="w-5 h-5 md:w-6 md:h-6" />
-                      {(userNotifications.some(n => !n.read) || pendingUsersCount > 0) && <span className="absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />}
+                  <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500 ${pendingUsersCount > 0 ? 'ring-4 ring-rose-500/20' : ''}`}>
+                      <BellIcon className={`w-5 h-5 md:w-6 md:h-6 ${pendingUsersCount > 0 ? 'text-rose-500' : ''}`} />
+                      {(userNotifications.some(n => !n.read) || pendingUsersCount > 0) && (
+                        <span className={`absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 ${pendingUsersCount > 0 ? 'animate-ping' : ''}`} />
+                      )}
                   </button>
                   {isNotifOpen && <div className="absolute right-0 mt-4 origin-top-right"><NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} /></div>}
               </div>
@@ -296,7 +318,7 @@ const App: React.FC = () => {
       <button onClick={() => { setEditingStation(null); setIsFormOpen(true); }} className="fixed z-50 right-10 bottom-10 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-all"><PlusIcon className="w-8 h-8" /></button>
 
       {isFormOpen && (
-        <StationForm station={editingStation} currentUserName={currentUser.name} onSave={handleSaveStation} onClose={() => { setIsFormOpen(false); setEditingStation(null); }} allUsers={users.filter(u => u.status === UserStatus.APPROVED)} isAdmin={currentUser.role === UserRole.ADMIN} />
+        <StationForm station={editingStation} currentUserName={currentUser.name} onSave={handleSaveStation} onClose={() => { setIsFormOpen(false); setEditingStation(null); }} allUsers={users.filter(u => u.status === UserStatus.APPROVED)} isAdmin={isAdmin} />
       )}
     </div>
   );
