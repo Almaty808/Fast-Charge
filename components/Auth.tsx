@@ -1,15 +1,14 @@
 
 import React, { useState } from 'react';
 import { User, UserStatus, UserRole } from '../types';
-import { PhoneIcon } from './Icons';
 
 interface AuthProps {
     onLogin: (user: User) => void;
+    onRegister: (user: User) => void;
     users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
-const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
+const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
     const [isLoginView, setIsLoginView] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -24,7 +23,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
         if (user) {
             onLogin(user);
         } else {
-            setError('Неверный email или пароль.');
+            setError('Неверные учетные данные. Пожалуйста, попробуйте еще раз.');
         }
     };
 
@@ -32,12 +31,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
         e.preventDefault();
         setError('');
         if (users.some(u => u.email === email)) {
-            setError('Пользователь с таким email уже существует.');
+            setError('Эта почта уже зарегистрирована.');
             return;
         }
 
         const newUser: User = {
-            id: new Date().toISOString(),
+            id: 'u-' + Math.random().toString(36).substring(2, 9),
             name,
             email,
             phone,
@@ -46,116 +45,94 @@ const Auth: React.FC<AuthProps> = ({ onLogin, users, setUsers }) => {
             role: UserRole.USER,
         };
 
-        setUsers(prevUsers => [...prevUsers, newUser]);
-        alert('Регистрация прошла успешно! Ваша учетная запись ожидает подтверждения администратором.');
+        onRegister(newUser);
+        alert('Заявка на регистрацию отправлена. Администратор подтвердит ваш доступ в ближайшее время.');
         setIsLoginView(true);
-        setName('');
-        setEmail('');
-        setPhone('');
-        setPassword('');
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-6 overflow-hidden relative">
-            {/* Background Decorations */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 rounded-full blur-[120px]" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 px-6 py-12 relative overflow-hidden">
+            <div className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] bg-primary-500/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
 
-            <div className="w-full max-w-lg p-10 bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl dark:shadow-slate-950/50 border border-slate-100 dark:border-slate-800 relative z-10 animate-slide-up">
-                <div className="text-center mb-10">
-                    <div className="inline-flex p-4 rounded-3xl bg-primary-600 shadow-xl shadow-primary-500/30 mb-6">
-                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+            <div className="w-full max-w-[480px] relative z-10 animate-slide-up">
+                <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.12)] p-10 md:p-14 border border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-col items-center mb-12">
+                        <div className="w-24 h-24 bg-gradient-to-br from-primary-600 to-indigo-700 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-primary-500/40 mb-8 transform hover:scale-105 transition-transform duration-500">
+                            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Fast Charge</h1>
+                        <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">Enterprise Solution</p>
                     </div>
-                    <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
-                        Fast Charge
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium tracking-wide uppercase text-[11px]">Система управления активами</p>
-                </div>
-                
-                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl mb-8">
-                    <button 
-                        onClick={() => setIsLoginView(true)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${isLoginView ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm' : 'text-slate-500'}`}
-                    >
-                        Вход
-                    </button>
-                    <button 
-                        onClick={() => setIsLoginView(false)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${!isLoginView ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm' : 'text-slate-500'}`}
-                    >
-                        Регистрация
-                    </button>
-                </div>
-                
-                {error && (
-                    <div className="mb-6 p-4 text-sm font-bold text-center text-red-600 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30 animate-shake">
-                        {error}
-                    </div>
-                )}
-                
-                <form onSubmit={isLoginView ? handleLoginSubmit : handleRegisterSubmit} className="space-y-5">
-                    {!isLoginView && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Имя</label>
+
+                    {error && (
+                        <div className="mb-8 p-5 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-sm font-bold text-center rounded-[1.5rem] animate-fade-in">
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={isLoginView ? handleLoginSubmit : handleRegisterSubmit} className="space-y-4">
+                        {!isLoginView && (
+                            <div className="grid grid-cols-1 gap-4">
                                 <input
                                     type="text"
                                     required
-                                    placeholder="Иван"
+                                    placeholder="Ваше имя"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
+                                    className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Телефон</label>
                                 <input
                                     type="tel"
                                     required
-                                    placeholder="+7..."
+                                    placeholder="Контактный телефон"
                                     value={phone}
                                     onChange={e => setPhone(e.target.value)}
-                                    className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
+                                    className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
                                 />
                             </div>
-                        </div>
-                    )}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Email</label>
+                        )}
                         <input
                             type="email"
                             required
-                            placeholder="mail@company.com"
+                            placeholder="Email адрес"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
+                            className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
                         />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Пароль</label>
                         <input
                             type="password"
                             required
-                            placeholder="••••••••"
+                            placeholder="Ваш пароль"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="block w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-4 focus:ring-primary-500/20 transition-all placeholder-slate-400 text-slate-900 dark:text-white font-medium"
+                            className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
                         />
-                    </div>
-                    
-                    <button
-                        type="submit"
-                        className="w-full py-5 px-6 rounded-2xl text-base font-extrabold text-white bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 shadow-xl shadow-primary-500/30 transition-all transform hover:scale-[1.02] active:scale-[0.98] mt-4"
-                    >
-                        {isLoginView ? 'Войти в панель' : 'Создать аккаунт'}
-                    </button>
-                </form>
 
-                <p className="mt-8 text-center text-xs font-medium text-slate-400">
-                    © 2024 Fast Charge Enterprise Edition. Все права защищены.
-                </p>
+                        <button
+                            type="submit"
+                            className="w-full py-5 bg-primary-600 hover:bg-primary-700 text-white rounded-3xl text-base font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 transition-all active:scale-[0.97] mt-6"
+                        >
+                            {isLoginView ? 'Войти в систему' : 'Создать аккаунт'}
+                        </button>
+                    </form>
+
+                    <div className="mt-12 pt-10 border-t border-slate-50 dark:border-slate-800 flex flex-col items-center gap-5">
+                        <button 
+                            onClick={() => setIsLoginView(!isLoginView)}
+                            className="text-sm font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors"
+                        >
+                            {isLoginView ? 'Ещё нет аккаунта? Регистрация' : 'Уже есть аккаунт? Войти'}
+                        </button>
+                        <div className="flex items-center gap-3">
+                            <span className="w-8 h-[1px] bg-slate-200 dark:bg-slate-800"></span>
+                            <p className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.25em]">Powered by Gemini AI</p>
+                            <span className="w-8 h-[1px] bg-slate-200 dark:bg-slate-800"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

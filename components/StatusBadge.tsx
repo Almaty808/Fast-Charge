@@ -6,17 +6,30 @@ interface StatusBadgeProps {
   status: StationStatus;
 }
 
-const statusColors: Record<StationStatus, string> = {
-  [StationStatus.PLANNED]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  [StationStatus.INSTALLED]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  [StationStatus.MAINTENANCE]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  [StationStatus.REMOVED]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+const statusConfig: Record<StationStatus, { color: string, label: string }> = {
+  [StationStatus.PLANNED]: { 
+    color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200/50 dark:border-amber-700/50', 
+    label: 'В планах' 
+  },
+  [StationStatus.INSTALLED]: { 
+    color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-700/50', 
+    label: 'Активна' 
+  },
+  [StationStatus.MAINTENANCE]: { 
+    color: 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 border-primary-200/50 dark:border-primary-700/50', 
+    label: 'Сервис' 
+  },
+  [StationStatus.REMOVED]: { 
+    color: 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300/50 dark:border-slate-600/50', 
+    label: 'Снята' 
+  },
 };
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const config = statusConfig[status];
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[status]}`}>
-      {status}
+    <span className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border ${config.color}`}>
+      {config.label}
     </span>
   );
 };
