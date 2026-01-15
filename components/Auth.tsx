@@ -22,26 +22,35 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
         e.preventDefault();
         setError('');
         
-        const searchId = loginIdInput.toLowerCase().trim();
-        const searchPassword = password; 
+        // Очищаем ввод: убираем пробелы и переводим в нижний регистр для поиска
+        const cleanInput = loginIdInput.trim().toLowerCase();
+        const cleanPassword = password.trim();
 
-        // Ищем пользователя по логину (loginId)
-        const user = users.find(u => 
-            u.loginId.toLowerCase().trim() === searchId
-        );
-
-        if (!user) {
-            setError('Сотрудник с таким ID не найден. Обратитесь к админу.');
+        if (!cleanInput || !cleanPassword) {
+            setError('Введите логин и пароль');
             return;
         }
 
-        if (user.password !== searchPassword) {
-            setError('Неверный пароль. Проверьте раскладку клавиатуры.');
+        // Поиск пользователя с максимальной гибкостью
+        const user = users.find(u => {
+            const storedId = (u.loginId || '').toString().trim().toLowerCase();
+            const storedEmail = (u.email || '').toString().trim().toLowerCase();
+            return storedId === cleanInput || storedEmail === cleanInput;
+        });
+
+        if (!user) {
+            setError(`Сотрудник с ID или Email "${loginIdInput}" не найден. Убедитесь, что администратор активировал ваш аккаунт.`);
+            return;
+        }
+
+        // Проверка пароля (тоже с trim для надежности)
+        if (user.password.trim() !== cleanPassword) {
+            setError('Неверный пароль. Попробуйте еще раз или обратитесь к администратору для сброса.');
             return;
         }
 
         if (user.status === UserStatus.PENDING) {
-            setError('Аккаунт еще не активирован администратором.');
+            setError('Ваш аккаунт зарегистрирован, но еще не активирован администратором.');
             return;
         }
 
@@ -52,22 +61,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
         e.preventDefault();
         setError('');
         
-        // Регистрация теперь тоже генерирует временный loginId или использует имя
-        const tempLoginId = 'USER-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        // Генерируем читаемый временный ID
+        const tempLoginId = 'fc-' + Math.random().toString(36).substring(2, 7);
 
         const newUser: User = {
-            id: 'u-' + Math.random().toString(36).substring(2, 9),
+            id: 'u-' + Date.now() + Math.random().toString(36).substring(7),
             loginId: tempLoginId,
             name: name.trim(),
-            email: email.trim(),
+            email: email.trim().toLowerCase(),
             phone: phone.trim(),
-            password: password,
+            password: password.trim(),
             status: UserStatus.PENDING,
             role: UserRole.USER,
         };
 
         onRegister(newUser);
-        alert(`Заявка отправлена! Если админ одобрит, ваш ID для входа будет: ${tempLoginId}`);
+        alert(`Заявка отправлена! Если администратор одобрит доступ, ваш логин для входа будет: ${tempLoginId.toUpperCase()}`);
         setIsLoginView(true);
     };
 
@@ -90,26 +99,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-8 md:p-10 border border-slate-100 dark:border-slate-800 animate-slide-up">
-                    <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-8">
+                    <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">
                         {isLoginView ? 'Вход в систему' : 'Запрос доступа'}
                     </h2>
+                    {isLoginView && (
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">
+                            Введите ID или рабочий Email
+                        </p>
+                    )}
 
                     {error && (
-                        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-black uppercase tracking-widest text-center rounded-2xl animate-fade-in">
+                        <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest text-center rounded-2xl animate-fade-in leading-relaxed">
                             {error}
                         </div>
                     )}
 
                     <form onSubmit={isLoginView ? handleLoginSubmit : handleRegisterSubmit} className="space-y-4">
                         {isLoginView ? (
-                            <input
-                                type="text"
-                                required
-                                placeholder="ID сотрудника (напр. admin-808)"
-                                value={loginIdInput}
-                                onChange={e => setLoginIdInput(e.target.value)}
-                                className="w-full h-16 px-6 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-base font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
-                            />
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">Идентификатор</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="ID (напр. ALIM-102) или Email"
+                                    value={loginIdInput}
+                                    onChange={e => setLoginIdInput(e.target.value)}
+                                    className="w-full h-16 px-6 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-base font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
+                                />
+                            </div>
                         ) : (
                             <div className="space-y-4">
                                 <input
@@ -123,7 +140,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                                 <input
                                     type="email"
                                     required
-                                    placeholder="Email для связи"
+                                    placeholder="Рабочий Email"
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                     className="w-full h-16 px-6 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-base font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
@@ -132,10 +149,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                         )}
                         
                         <div className="relative">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">Пароль</label>
                             <input
                                 type={showPassword ? "text" : "password"}
                                 required
-                                placeholder="Пароль"
+                                placeholder="••••••••"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 className="w-full h-16 px-6 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-base font-bold focus:ring-4 focus:ring-primary-500/15 transition-all text-slate-900 dark:text-white"
@@ -143,7 +161,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                             <button 
                                 type="button" 
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400"
+                                className="absolute right-6 top-[55%] -translate-y-1/2 text-slate-400 hover:text-primary-500 transition-colors"
                             >
                                 {showPassword ? (
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -164,9 +182,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onRegister, users }) => {
                     <div className="mt-8 pt-8 border-t border-slate-50 dark:border-slate-800 text-center">
                         <button 
                             onClick={() => setIsLoginView(!isLoginView)}
-                            className="text-sm font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest"
+                            className="text-[10px] font-black text-primary-600 dark:text-primary-400 uppercase tracking-[0.2em] hover:opacity-70 transition-opacity"
                         >
-                            {isLoginView ? 'Нужен доступ?' : 'Вернуться ко входу'}
+                            {isLoginView ? 'Нет доступа? Оставьте заявку' : 'Вернуться к авторизации'}
                         </button>
                     </div>
                 </div>

@@ -60,27 +60,38 @@ const App: React.FC = () => {
   const pendingUsersCount = pendingUsers.length;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
+  // Безопасная инициализация мастер-админа
   useEffect(() => {
+    const masterEmail = 'almaty808@gmail.com';
     const masterLogin = 'admin-808';
-    const foundMaster = users.find(u => u.loginId === masterLogin);
+    
+    const masterExists = users.some(u => 
+      (u.email && u.email.toLowerCase() === masterEmail) || 
+      (u.loginId && u.loginId.toLowerCase() === masterLogin)
+    );
 
-    if (!foundMaster) {
+    if (!masterExists) {
       const master: User = {
         id: 'master-001',
         loginId: masterLogin,
         name: 'Главный Администратор',
-        email: 'almaty808@gmail.com',
+        email: masterEmail,
         phone: '+7 777 808 8888',
         password: '1qazaq1',
         status: UserStatus.APPROVED,
         role: UserRole.ADMIN,
         groupId: 'g-admin'
       };
-      setUsers(prev => [master, ...prev]);
-    } else if (foundMaster.status !== UserStatus.APPROVED) {
-      setUsers(prev => prev.map(u => u.loginId === masterLogin ? { ...u, status: UserStatus.APPROVED } : u));
+      // Используем функциональное обновление, чтобы не зависеть от замыкания 'users'
+      setUsers(prev => {
+        const stillMissing = !prev.some(u => 
+          (u.email && u.email.toLowerCase() === masterEmail) || 
+          (u.loginId && u.loginId.toLowerCase() === masterLogin)
+        );
+        return stillMissing ? [master, ...prev] : prev;
+      });
     }
-  }, [users, setUsers]);
+  }, [setUsers]); // Убираем 'users' из зависимостей для предотвращения циклов
 
   const createNotification = (message: string, type: AppNotification['type'] = 'info', targetUserId?: string) => {
     const newNotif: AppNotification = {
@@ -206,7 +217,7 @@ const App: React.FC = () => {
                                 <div className="min-w-0">
                                     <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{user.name}</h4>
                                     <div className="flex flex-col gap-1 mt-1">
-                                      <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">ID: {user.loginId}</span>
+                                      <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded-lg w-fit">ID: {user.loginId || '—'}</span>
                                       <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border w-fit ${isPending ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 border-primary-100 dark:border-primary-800'}`}>
                                           {isPending ? 'Ожидает' : user.role}
                                       </span>

@@ -78,7 +78,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Inventory Edit State
     const [editingInvItem, setEditingInvItem] = useState<InventoryItem | null>(null);
     const [invFormData, setInvFormData] = useState<Partial<InventoryItem>>({});
 
@@ -94,7 +93,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleApprove = (userId: string) => {
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: UserStatus.APPROVED } : u));
-        onSendMessage('Ваш аккаунт подтвержден! Добро пожаловать в команду.', 'success', userId);
+        onSendMessage('Ваш аккаунт подтвержден! Теперь вы можете войти в систему.', 'success', userId);
     };
 
     const handleUpdateStock = (itemId: string, amount: number) => {
@@ -119,42 +118,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleSaveInventoryDetails = () => {
         if (!editingInvItem || !invFormData.name) return;
-
-        setInventoryItems(prev => prev.map(item => 
-            item.id === editingInvItem.id ? { ...item, ...invFormData, lastUpdated: new Date().toISOString() } : item
-        ));
-
-        // Логируем изменение деталей
-        const log: StockLog = {
-            id: 'log-edit-' + Date.now(),
-            itemId: editingInvItem.id,
-            itemName: invFormData.name || editingInvItem.name,
-            change: 0,
-            author: 'Администратор',
-            timestamp: new Date().toISOString()
-        };
-        setStockLogs([log, ...stockLogs.slice(0, 49)]);
-
+        setInventoryItems(prev => prev.map(item => item.id === editingInvItem.id ? { ...item, ...invFormData, lastUpdated: new Date().toISOString() } : item));
         setEditingInvItem(null);
-    };
-
-    const handleAiAnalysis = async () => {
-        setIsAnalyzing(true);
-        try {
-            const result = await analyzeInventory(inventoryItems);
-            setAiAnalysis(result);
-        } catch (e) {
-            setAiAnalysis("Ошибка анализа.");
-        } finally {
-            setIsAnalyzing(false);
-        }
     };
 
     const handleOpenUserModal = (user: User | null = null) => {
         if (user) {
             setEditingUser(user);
             setUserData({ 
-                loginId: user.loginId,
+                loginId: user.loginId || '',
                 name: user.name, 
                 email: user.email, 
                 phone: user.phone, 
@@ -165,7 +137,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         } else {
             setEditingUser(null);
             setUserData({ 
-                loginId: 'FC-' + (users.length + 100),
+                loginId: 'FC-' + (users.length + 101),
                 name: '', 
                 email: '', 
                 phone: '', 
@@ -178,33 +150,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     const handleSaveUser = () => {
-        const normalizedLoginId = userData.loginId.toLowerCase().trim();
-        if (!normalizedLoginId || !userData.name || !userData.password) {
-            alert('Заполните обязательные поля: ID, Имя и Пароль');
+        // Убираем лишние пробелы, но сохраняем регистр для отображения
+        const cleanLoginId = userData.loginId.trim();
+        const cleanName = userData.name.trim();
+
+        if (!cleanLoginId || !cleanName || !userData.password) {
+            alert('Заполните все обязательные поля');
             return;
         }
+
         if (editingUser) {
-            setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...userData, loginId: normalizedLoginId, status: UserStatus.APPROVED } : u));
-            onSendMessage(`Ваш профиль обновлен. Ваш ID для входа: ${normalizedLoginId}`, 'info', editingUser.id);
+            setUsers(prev => prev.map(u => u.id === editingUser.id ? { 
+                ...u, 
+                ...userData, 
+                loginId: cleanLoginId,
+                name: cleanName,
+                status: UserStatus.APPROVED 
+            } : u));
         } else {
-            if (users.some(u => u.loginId.toLowerCase().trim() === normalizedLoginId)) {
-                alert('Пользователь с таким ID уже существует!');
+            // Проверка на уникальность логина (без учета регистра)
+            const exists = users.some(u => (u.loginId || '').toLowerCase() === cleanLoginId.toLowerCase());
+            if (exists) {
+                alert('Сотрудник с таким ID уже существует!');
                 return;
             }
-            const newUser: User = { id: 'u-' + Date.now(), ...userData, loginId: normalizedLoginId, status: UserStatus.APPROVED };
+
+            const newUser: User = { 
+                id: 'u-' + Date.now() + Math.random().toString(36).substring(7), 
+                ...userData, 
+                loginId: cleanLoginId, 
+                name: cleanName,
+                status: UserStatus.APPROVED 
+            };
             setUsers(prev => [...prev, newUser]);
         }
         setIsAddUserModalOpen(false);
-    };
-
-    const getInvStatusColor = (status: InventoryStatus) => {
-        switch (status) {
-            case InventoryStatus.IN_STOCK: return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-            case InventoryStatus.LOW: return 'bg-amber-50 text-amber-600 border-amber-100';
-            case InventoryStatus.OUT: return 'bg-rose-50 text-rose-600 border-rose-100';
-            case InventoryStatus.ORDERED: return 'bg-indigo-50 text-indigo-600 border-indigo-100';
-            default: return 'bg-slate-50 text-slate-600 border-slate-100';
-        }
     };
 
     const menuItems: AdminMenuItem[] = [
@@ -214,52 +194,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         { id: 'inventory', label: 'Склад и запасы', icon: PackageIcon },
         { id: 'logs', label: 'Журнал событий', icon: HistoryIcon },
     ];
-
-    const renderUsers = () => {
-        const filteredPending = pendingUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.loginId.toLowerCase().includes(userSearch.toLowerCase()));
-        const filteredActive = activeUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.loginId.toLowerCase().includes(userSearch.toLowerCase()));
-        return (
-            <div className="space-y-12">
-                <div className="flex flex-col lg:flex-row gap-6 items-center justify-between">
-                    <div className="relative w-full lg:w-96">
-                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Поиск по ФИО или ID..." className="w-full pl-12 pr-6 py-5 bg-white dark:bg-slate-800 rounded-3xl border-none shadow-sm text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" />
-                    </div>
-                    <button onClick={() => handleOpenUserModal()} className="w-full lg:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3 active:scale-95">
-                        <PlusIcon className="w-5 h-5" /> Создать новый аккаунт
-                    </button>
-                </div>
-                {filteredPending.length > 0 && (
-                    <div className="space-y-6">
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2 flex items-center gap-3"><div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />Новые заявки ({filteredPending.length})</h3>
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                            {filteredPending.map(u => (
-                                <div key={u.id} className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-xl flex flex-col md:flex-row gap-6 items-center animate-scale-in">
-                                    <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 font-black text-3xl shrink-0">{u.name.charAt(0)}</div>
-                                    <div className="flex-1 text-center md:text-left min-w-0"><h4 className="text-xl font-black text-slate-900 dark:text-white truncate">{u.name}</h4><p className="text-sm text-slate-500 font-medium mb-1">ID (временный): {u.loginId}</p><p className="text-xs text-slate-400 font-medium truncate">{u.email}</p></div>
-                                    <div className="flex gap-2 w-full md:w-auto"><button onClick={() => handleApprove(u.id)} className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Одобрить</button><button onClick={() => { if(confirm('Удалить?')) setUsers(prev => prev.filter(p => p.id !== u.id)) }} className="p-4 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"><TrashIcon className="w-6 h-6" /></button></div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                <div className="space-y-6">
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight ml-2">Список сотрудников ({activeUsers.length})</h3>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        {filteredActive.map(u => (
-                            <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                                <div className="flex items-center gap-5 flex-1 min-w-0">
-                                    <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0 ${u.role === UserRole.ADMIN ? 'bg-gradient-to-br from-rose-500 to-rose-700' : 'bg-gradient-to-br from-primary-500 to-indigo-600'}`}>{u.name.charAt(0)}</div>
-                                    <div className="min-w-0"><h4 className="text-base font-black text-slate-900 dark:text-white truncate">{u.name}</h4><p className="text-sm font-black text-primary-600 uppercase tracking-widest">ID: {u.loginId}</p><p className="text-xs text-slate-400 font-medium truncate mt-1">{u.role} • {u.phone}</p></div>
-                                </div>
-                                <div className="flex gap-2 shrink-0"><button onClick={() => handleOpenUserModal(u)} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-primary-500 hover:bg-primary-50 transition-colors"><EditIcon className="w-5 h-5" /></button><button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl text-red-500 hover:bg-red-100 transition-colors"><TrashIcon className="w-5 h-5" /></button></div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-['Plus_Jakarta_Sans']">
@@ -292,37 +226,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>}
                     {activeTab === 'inventory' && (
                         <div className="space-y-8 animate-fade-in">
-                            <div className="bg-gradient-to-br from-indigo-600 to-primary-700 rounded-[2.5rem] p-10 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden relative">
-                                <div className="absolute top-0 right-0 p-10 opacity-10"><SparklesIcon className="w-32 h-32" /></div>
-                                <div className="relative z-10 max-w-xl">
-                                    <h3 className="text-3xl font-black mb-3 flex items-center gap-3"><SparklesIcon className="w-8 h-8" />AI Складской Прогноз</h3>
-                                    <p className="text-indigo-100 font-medium leading-relaxed italic">{aiAnalysis || "Нажмите для анализа остатков."}</p>
-                                </div>
-                                <button onClick={handleAiAnalysis} disabled={isAnalyzing} className="relative z-10 px-8 py-4 bg-white text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-lg active:scale-95">{isAnalyzing ? 'Анализ...' : 'Запустить ИИ'}</button>
-                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {inventoryItems.map(item => (
-                                    <div key={item.id} className={`bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 transition-all shadow-sm ${item.quantity <= item.minThreshold ? 'border-rose-500/30 shadow-rose-500/5' : 'border-slate-100 dark:border-slate-800'}`}>
+                                    <div key={item.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm">
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 flex items-center justify-center"><PackageIcon className="w-6 h-6" /></div>
                                             <div className="flex gap-2">
-                                                <button 
-                                                    onClick={() => { setEditingInvItem(item); setInvFormData({ ...item }); }}
-                                                    className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary-600 flex items-center justify-center transition-colors shadow-sm"
-                                                >
-                                                    <EditIcon className="w-5 h-5" />
-                                                </button>
+                                                <button onClick={() => { setEditingInvItem(item); setInvFormData({ ...item }); }} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary-600 flex items-center justify-center transition-colors"><EditIcon className="w-5 h-5" /></button>
                                                 <div className="text-right"><p className="text-3xl font-black text-slate-900 dark:text-white leading-none">{item.quantity}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{item.unit}</p></div>
                                             </div>
                                         </div>
                                         <h4 className="text-lg font-black text-slate-800 dark:text-white mb-2">{item.name}</h4>
                                         <div className="flex items-center gap-2 mb-6">
-                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${getInvStatusColor(item.status)}`}>
+                                            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${item.quantity > item.minThreshold ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                                                 {item.status}
                                             </span>
-                                            {item.quantity <= item.minThreshold && (
-                                                <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Критический запас!</span>
-                                            )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 mt-4">
                                             <button onClick={() => handleUpdateStock(item.id, -1)} className="py-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 font-black hover:bg-rose-50 hover:text-rose-600 transition-all">-1</button>
@@ -333,82 +251,99 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                         </div>
                     )}
-                    {activeTab === 'users' && renderUsers()}
-                </div>
-            </main>
+                    {activeTab === 'users' && (
+                        <div className="space-y-8 animate-fade-in">
+                            <div className="flex flex-col lg:flex-row gap-6 items-center justify-between">
+                                <div className="relative w-full lg:w-96">
+                                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Поиск сотрудника..." className="w-full pl-12 pr-6 py-5 bg-white dark:bg-slate-800 rounded-3xl border-none shadow-sm text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" />
+                                </div>
+                                <button onClick={() => handleOpenUserModal()} className="w-full lg:w-auto px-10 py-5 bg-primary-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition-all flex items-center justify-center gap-3 active:scale-95">
+                                    <PlusIcon className="w-5 h-5" /> Добавить сотрудника
+                                </button>
+                            </div>
 
-            {/* Inventory Edit Modal */}
-            {editingInvItem && (
-                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] flex items-center justify-center p-6">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-scale-in border border-white/5">
-                        <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">Редактор склада</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Детали: {editingInvItem.id}</p></div>
-                            <button onClick={() => setEditingInvItem(null)} className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500">✕</button>
-                        </div>
-                        <div className="p-10 space-y-6">
-                            <div>
-                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Название товара <span className="text-rose-500">*</span></label>
-                                <input value={invFormData.name} onChange={e => setInvFormData({...invFormData, name: e.target.value})} placeholder="Название..." className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Статус <span className="text-rose-500">*</span></label>
-                                    <select value={invFormData.status} onChange={e => setInvFormData({...invFormData, status: e.target.value as InventoryStatus})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest text-slate-500">
-                                        {Object.values(InventoryStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                            {pendingUsers.length > 0 && (
+                                <div className="space-y-4">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 ml-2">
+                                        <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+                                        Новые заявки ({pendingUsers.length})
+                                    </h3>
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                        {pendingUsers.map(u => (
+                                            <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-sm flex items-center gap-6">
+                                                <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-black text-xl shrink-0">{u.name.charAt(0)}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ID: {u.loginId}</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleApprove(u.id)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">Одобрить</button>
+                                                    <button onClick={() => setUsers(prev => prev.filter(x => x.id !== u.id))} className="p-3 bg-rose-50 text-rose-600 rounded-xl"><TrashIcon className="w-5 h-5" /></button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Категория <span className="text-rose-500">*</span></label>
-                                    <select value={invFormData.category} onChange={e => setInvFormData({...invFormData, category: e.target.value as any})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest text-slate-500">
-                                        <option value="hardware">Оборудование</option>
-                                        <option value="cables">Кабели</option>
-                                        <option value="sim">SIM-карты</option>
-                                        <option value="marketing">Маркетинг</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Мин. порог</label>
-                                    <input type="number" value={invFormData.minThreshold} onChange={e => setInvFormData({...invFormData, minThreshold: parseInt(e.target.value)})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ед. изм.</label>
-                                    <input value={invFormData.unit} onChange={e => setInvFormData({...invFormData, unit: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm" />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-10 border-t border-slate-100 dark:border-slate-800"><button onClick={handleSaveInventoryDetails} className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all">Обновить данные товара</button></div>
-                    </div>
-                </div>
-            )}
+                            )}
 
-            {/* User Modal */}
-            {isAddUserModalOpen && (
-                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[150] flex items-center justify-center p-6">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-scale-in border border-white/5">
-                        <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">{editingUser ? 'Редактировать сотрудника' : 'Добавить сотрудника'}</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Создайте ID и пароль для входа</p></div>
-                            <button onClick={() => setIsAddUserModalOpen(false)} className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500">✕</button>
-                        </div>
-                        <div className="p-10 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="md:col-span-2"><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ID для входа <span className="text-rose-500">*</span></label><input value={userData.loginId} onChange={e => setUserData({...userData, loginId: e.target.value.toUpperCase()})} placeholder="FC-101" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-primary-600 focus:ring-4 focus:ring-primary-500/10 transition-all" /><p className="text-[9px] text-slate-400 mt-1 uppercase tracking-tighter">Сотрудник будет использовать этот код вместо Email</p></div>
-                                <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ФИО <span className="text-rose-500">*</span></label><input value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} placeholder="Александр Петров" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
-                                <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Пароль <span className="text-rose-500">*</span></label><input type="text" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} placeholder="Введите пароль" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
-                                <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email</label><input type="email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} placeholder="petrov@mail.com" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
-                                <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Телефон</label><input type="tel" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} placeholder="+7 777..." className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Роль</label>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {[UserRole.INSTALLER, UserRole.MANAGER, UserRole.USER, UserRole.ADMIN].map(role => (
-                                        <button key={role} onClick={() => setUserData({...userData, role})} className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${userData.role === role ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-800'}`}>{role}</button>
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white ml-2">Список сотрудников ({activeUsers.length})</h3>
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {activeUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || (u.loginId || '').toLowerCase().includes(userSearch.toLowerCase())).map(u => (
+                                        <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-6 transition-transform hover:scale-[1.01]">
+                                            <div className="w-14 h-14 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shrink-0 shadow-lg">{u.name.charAt(0)}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="px-2 py-0.5 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                                        ID: {u.loginId}
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{u.role}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => handleOpenUserModal(u)} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-slate-400 hover:text-primary-600 transition-colors"><EditIcon className="w-5 h-5" /></button>
+                                                <button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(prev => prev.filter(x => x.id !== u.id)) }} className="p-3 bg-rose-50 dark:bg-rose-900/10 rounded-xl text-rose-500 hover:bg-rose-100 transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
-                        <div className="p-10 border-t border-slate-100 dark:border-slate-800"><button onClick={handleSaveUser} className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 active:scale-[0.98] transition-all">{editingUser ? 'Сохранить изменения' : 'Создать и активировать аккаунт'}</button></div>
+                    )}
+                </div>
+            </main>
+
+            {/* User Create/Edit Modal */}
+            {isAddUserModalOpen && (
+                <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[150] flex items-center justify-center p-6">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/5 animate-scale-in">
+                        <div className="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                            <div><h3 className="text-2xl font-black text-slate-900 dark:text-white">{editingUser ? 'Редактор профиля' : 'Новый сотрудник'}</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Настройка прав и доступа</p></div>
+                            <button onClick={() => setIsAddUserModalOpen(false)} className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500">✕</button>
+                        </div>
+                        <div className="p-10 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Логин (ID для входа) <span className="text-rose-500">*</span></label>
+                                    <input value={userData.loginId} onChange={e => setUserData({...userData, loginId: e.target.value})} placeholder="Напр. ALIM-102" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-black text-primary-600 focus:ring-4 focus:ring-primary-500/10 transition-all" />
+                                </div>
+                                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">ФИО <span className="text-rose-500">*</span></label><input value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} placeholder="Имя сотрудника" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
+                                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Пароль <span className="text-rose-500">*</span></label><input type="text" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})} placeholder="Придумайте пароль" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
+                                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Email</label><input type="email" value={userData.email} onChange={e => setUserData({...userData, email: e.target.value})} placeholder="work@mail.com" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
+                                <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Телефон</label><input type="tel" value={userData.phone} onChange={e => setUserData({...userData, phone: e.target.value})} placeholder="+7 777..." className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none font-bold text-sm focus:ring-4 focus:ring-primary-500/10 transition-all" /></div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Роль доступа</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[UserRole.INSTALLER, UserRole.MANAGER, UserRole.USER, UserRole.ADMIN].map(role => (
+                                        <button key={role} onClick={() => setUserData({...userData, role})} className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${userData.role === role ? 'bg-primary-600 text-white border-primary-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-transparent'}`}>{role}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-10 border-t border-slate-100 dark:border-slate-800"><button onClick={handleSaveUser} className="w-full py-5 bg-primary-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-primary-500/30 active:scale-95 transition-all">{editingUser ? 'Применить изменения' : 'Создать и активировать'}</button></div>
                     </div>
                 </div>
             )}
