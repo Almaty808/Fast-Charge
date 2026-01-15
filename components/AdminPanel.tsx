@@ -19,7 +19,8 @@ import {
     EnvelopeIcon,
     HistoryIcon,
     DownloadIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    CameraIcon
 } from './Icons';
 import StatusBadge from './StatusBadge';
 
@@ -47,6 +48,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'tasks' | 'stations' | 'groups' | 'logs' | 'settings'>('dashboard');
     const [stationSearch, setStationSearch] = useState('');
+    const [userSearch, setUserSearch] = useState('');
     const [msgModal, setMsgModal] = useState<{ userId: string, type: 'push' | 'email' } | null>(null);
     const [msgBody, setMsgBody] = useState('');
     
@@ -55,12 +57,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [editingGroup, setEditingGroup] = useState<UserGroup | null>(null);
     const [groupData, setGroupData] = useState({ name: '', description: '', permissions: [] as AppPermission[] });
 
+    const pendingUsers = useMemo(() => users.filter(u => u.status === UserStatus.PENDING), [users]);
+    const activeUsers = useMemo(() => users.filter(u => u.status === UserStatus.APPROVED), [users]);
+
     const stats = useMemo(() => ({
         total: stations.length,
         installed: stations.filter(s => s.status === StationStatus.INSTALLED).length,
         maintenance: stations.filter(s => s.status === StationStatus.MAINTENANCE).length,
-        pendingUsers: users.filter(u => u.status === UserStatus.PENDING).length
-    }), [stations, users]);
+        pendingCount: pendingUsers.length
+    }), [stations, pendingUsers]);
+
+    const handleApprove = (userId: string) => {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: UserStatus.APPROVED } : u));
+    };
 
     const handleSend = () => {
         if (!msgBody || !msgModal) return;
@@ -98,7 +107,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         { id: 'dashboard', label: 'Панель управления', icon: ChartIcon },
         { id: 'stations', label: 'Все объекты', icon: MapPinIcon },
         { id: 'tasks', label: 'Задачи команды', icon: CheckIcon },
-        { id: 'users', label: 'Сотрудники', icon: UsersIcon, badge: stats.pendingUsers > 0 },
+        { id: 'users', label: 'Сотрудники', icon: UsersIcon, badge: stats.pendingCount > 0 },
         { id: 'groups', label: 'Группы доступа', icon: CogIcon },
         { id: 'logs', label: 'Журнал событий', icon: HistoryIcon },
         { id: 'settings', label: 'Склад и запасы', icon: PackageIcon },
@@ -111,10 +120,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     { label: 'Всего объектов', val: stats.total, icon: MapPinIcon, col: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/20' },
                     { label: 'Установлено', val: stats.installed, icon: CheckIcon, col: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
                     { label: 'Запас на складе', val: inventoryCount, icon: PackageIcon, col: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-                    { label: 'Новые заявки', val: stats.pendingUsers, icon: UsersIcon, col: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+                    { label: 'Новые заявки', val: stats.pendingCount, icon: UsersIcon, col: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', pulse: stats.pendingCount > 0 },
                 ].map((s, idx) => (
                     <div key={idx} className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700 shadow-sm transition-transform hover:scale-[1.02]">
-                        <div className={`w-12 h-12 rounded-2xl ${s.bg} flex items-center justify-center mb-4 shadow-sm`}>
+                        <div className={`w-12 h-12 rounded-2xl ${s.bg} flex items-center justify-center mb-4 shadow-sm ${s.pulse ? 'animate-pulse' : ''}`}>
                             <s.icon className={`w-6 h-6 ${s.col}`} />
                         </div>
                         <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
@@ -124,34 +133,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white">Последние уведомления</h3>
-                        <button className="text-xs font-bold text-primary-600 hover:underline">Все события</button>
-                    </div>
-                    <div className="space-y-6">
-                        {notifications.length > 0 ? (
-                          notifications.slice(0, 8).map(n => (
-                            <div key={n.id} className="flex gap-4 items-start group">
-                                <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
-                                    n.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
-                                    n.type === 'assignment' ? 'bg-primary-50 text-primary-600' :
-                                    'bg-slate-50 text-slate-500'
-                                }`}>
-                                    {n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-slate-800 dark:text-slate-200 font-bold group-hover:text-primary-600 transition-colors leading-tight">{n.message}</p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{n.author}</span>
-                                        <span className="text-[10px] text-slate-400">• {new Date(n.timestamp).toLocaleString([], {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}</span>
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Виджет новых заявок на Dashboard */}
+                    {pendingUsers.length > 0 && (
+                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border-2 border-rose-100 dark:border-rose-900/30 p-8 shadow-xl shadow-rose-500/5">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                    <ClockIcon className="w-5 h-5 text-rose-500" />
+                                    Ожидают подтверждения ({pendingUsers.length})
+                                </h3>
+                                <button onClick={() => setActiveTab('users')} className="text-xs font-bold text-primary-600 hover:underline">Все сотрудники</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {pendingUsers.map(u => (
+                                    <div key={u.id} className="p-4 bg-rose-50/50 dark:bg-rose-950/10 rounded-2xl flex items-center justify-between gap-4 border border-rose-100/50 dark:border-rose-900/20">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-black text-slate-900 dark:text-white truncate">{u.name}</p>
+                                            <p className="text-[10px] text-slate-500 truncate">{u.email}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleApprove(u.id)}
+                                            className="px-4 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-colors shadow-lg shadow-rose-500/20"
+                                        >
+                                            Одобрить
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-100 dark:border-slate-700 p-8 shadow-sm">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white">Последние уведомления</h3>
+                            <button className="text-xs font-bold text-primary-600 hover:underline">Все события</button>
+                        </div>
+                        <div className="space-y-6">
+                            {notifications.length > 0 ? (
+                              notifications.slice(0, 8).map(n => (
+                                <div key={n.id} className="flex gap-4 items-start group">
+                                    <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
+                                        n.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+                                        n.type === 'assignment' ? 'bg-primary-50 text-primary-600' :
+                                        'bg-slate-50 text-slate-500'
+                                    }`}>
+                                        {n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm text-slate-800 dark:text-slate-200 font-bold group-hover:text-primary-600 transition-colors leading-tight">{n.message}</p>
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{n.author}</span>
+                                            <span className="text-[10px] text-slate-400">• {new Date(n.timestamp).toLocaleString([], {day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit'})}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="py-10 text-center text-slate-400">Нет новых событий</div>
-                        )}
+                              ))
+                            ) : (
+                              <div className="py-10 text-center text-slate-400">Нет новых событий</div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -184,53 +224,109 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
     );
 
-    const renderUsers = () => (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {users.map(u => (
-                <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                    <div className="flex items-center gap-5 flex-1 min-w-0">
-                        <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0">{u.name.charAt(0)}</div>
-                        <div className="min-w-0">
-                            <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                <span className="text-[10px] text-primary-600 font-black uppercase tracking-widest">{u.role}</span>
-                                {u.groupId && (
-                                    <span className="text-[9px] bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-bold text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600">
-                                        {userGroups.find(g => g.id === u.groupId)?.name}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-slate-400 font-medium mt-1 truncate">{u.email} • {u.phone}</p>
+    const renderUsers = () => {
+        const filteredPending = pendingUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()));
+        const filteredActive = activeUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()));
+
+        return (
+            <div className="space-y-12">
+                <div className="relative max-w-md mb-8">
+                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <input 
+                        value={userSearch} 
+                        onChange={e => setUserSearch(e.target.value)} 
+                        placeholder="Поиск по имени или email..." 
+                        className="w-full pl-12 pr-6 py-4 bg-white dark:bg-slate-800 rounded-2xl border-none shadow-sm text-sm"
+                    />
+                </div>
+
+                {/* Секция заявок - всегда сверху, если есть */}
+                {filteredPending.length > 0 && (
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Заявки на регистрацию ({filteredPending.length})</h3>
+                        </div>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            {filteredPending.map(u => (
+                                <div key={u.id} className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border-2 border-rose-100 dark:border-rose-900/30 shadow-xl shadow-rose-500/5 flex flex-col md:flex-row gap-6 items-center">
+                                    <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 font-black text-3xl shrink-0">
+                                        {u.name.charAt(0)}
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h4 className="text-xl font-black text-slate-900 dark:text-white">{u.name}</h4>
+                                        <p className="text-sm text-slate-500 font-medium mb-2">{u.email} • {u.phone}</p>
+                                        <span className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg">Новый участник</span>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        <button 
+                                            onClick={() => handleApprove(u.id)}
+                                            className="flex-1 md:px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                                        >
+                                            Активировать
+                                        </button>
+                                        <button 
+                                            onClick={() => { if(confirm('Удалить заявку?')) setUsers(us => us.filter(x => x.id !== u.id)) }}
+                                            className="p-4 bg-rose-50 dark:bg-rose-900/20 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white transition-all"
+                                        >
+                                            <TrashIcon className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    
-                    <div className="flex flex-col gap-3 w-full sm:w-auto shrink-0">
-                        <div className="flex gap-2">
-                            <button onClick={() => setMsgModal({ userId: u.id, type: 'push' })} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-primary-500 transition-colors" title="Push"><BellIcon className="w-5 h-5" /></button>
-                            <button onClick={() => setMsgModal({ userId: u.id, type: 'email' })} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-indigo-500 transition-colors" title="Email"><EnvelopeIcon className="w-5 h-5" /></button>
-                            <button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-3 bg-red-50 dark:bg-red-900/10 rounded-xl hover:bg-red-100 text-red-500 transition-colors" title="Delete"><TrashIcon className="w-5 h-5" /></button>
-                        </div>
-                        <select 
-                            value={u.groupId || ''} 
-                            onChange={(e) => setUsers(us => us.map(user => user.id === u.id ? { ...user, groupId: e.target.value } : user))}
-                            className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-700/50 border-none rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500"
-                        >
-                            <option value="">Без группы</option>
-                            {userGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                        </select>
-                        {u.status === UserStatus.PENDING && (
-                            <button onClick={() => setUsers(us => us.map(x => x.id === u.id ? {...x, status: UserStatus.APPROVED} : x))} className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform">Активировать</button>
-                        )}
+                )}
+
+                {/* Основной список активных сотрудников */}
+                <div className="space-y-6">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Активный штат ({activeUsers.length})</h3>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        {filteredActive.map(u => (
+                            <div key={u.id} className="bg-white dark:bg-slate-800 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                                <div className="flex items-center gap-5 flex-1 min-w-0">
+                                    <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0">{u.name.charAt(0)}</div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{u.name}</h4>
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            <span className="text-[10px] text-primary-600 font-black uppercase tracking-widest">{u.role}</span>
+                                            {u.groupId && (
+                                                <span className="text-[9px] bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full font-bold text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600">
+                                                    {userGroups.find(g => g.id === u.groupId)?.name}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400 font-medium mt-1 truncate">{u.email} • {u.phone}</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col gap-3 w-full sm:w-auto shrink-0">
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setMsgModal({ userId: u.id, type: 'push' })} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-primary-500 transition-colors" title="Push"><BellIcon className="w-5 h-5" /></button>
+                                        <button onClick={() => setMsgModal({ userId: u.id, type: 'email' })} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-primary-50 text-indigo-500 transition-colors" title="Email"><EnvelopeIcon className="w-5 h-5" /></button>
+                                        <button onClick={() => { if(confirm('Удалить сотрудника?')) setUsers(us => us.filter(x => x.id !== u.id)) }} className="p-3 bg-red-50 dark:bg-red-900/10 rounded-xl hover:bg-red-100 text-red-500 transition-colors" title="Delete"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                    <select 
+                                        value={u.groupId || ''} 
+                                        onChange={(e) => setUsers(us => us.map(user => user.id === u.id ? { ...user, groupId: e.target.value } : user))}
+                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-700/50 border-none rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500"
+                                    >
+                                        <option value="">Без группы</option>
+                                        {userGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-            ))}
-        </div>
-    );
+            </div>
+        );
+    };
 
     const renderTasks = () => (
         <div className="space-y-8 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {users.filter(u => u.status === UserStatus.APPROVED).map(user => {
+                {activeUsers.map(user => {
                     const userStations = stations.filter(s => s.assignedUserId === user.id);
                     return (
                         <div key={user.id} className="bg-white dark:bg-slate-800 rounded-[3rem] border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
