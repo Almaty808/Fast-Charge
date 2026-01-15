@@ -38,6 +38,7 @@ interface NavItem {
   id: AppView;
   label: string;
   icon: React.FC<{ className?: string }>;
+  badge?: boolean;
 }
 
 const App: React.FC = () => {
@@ -54,6 +55,8 @@ const App: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('Все');
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<AppView>('app');
+
+  const pendingUsersCount = useMemo(() => users.filter(u => u.status === UserStatus.PENDING).length, [users]);
 
   useEffect(() => {
     const masterEmail = 'almaty808@gmail.com';
@@ -138,7 +141,7 @@ const App: React.FC = () => {
     { id: 'app', label: 'Объекты', icon: MapPinIcon },
     { id: 'stats', label: 'Аналитика', icon: ChartPieIcon },
     { id: 'team', label: 'Команда', icon: UsersIcon },
-    ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon }] : [])
+    ...(currentUser?.role === UserRole.ADMIN ? [{ id: 'admin' as AppView, label: 'Админ', icon: CogIcon, badge: pendingUsersCount > 0 }] : [])
   ];
 
   const renderMainContent = () => {
@@ -248,9 +251,12 @@ const App: React.FC = () => {
         </div>
         <nav className="flex-1 px-4 space-y-2">
           {navItems.map((item: NavItem) => (
-            <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+            <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all relative ${view === item.id ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/20' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
               <item.icon className="w-5 h-5" />
               <span>{item.label}</span>
+              {item.badge && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm shadow-rose-500/50" />
+              )}
             </button>
           ))}
         </nav>
@@ -275,7 +281,7 @@ const App: React.FC = () => {
               <div className="relative">
                   <button onClick={() => setIsNotifOpen(!isNotifOpen)} className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-xl md:rounded-2xl bg-white dark:bg-slate-800/50 shadow-sm border border-slate-100 dark:border-slate-700/50 text-slate-500">
                       <BellIcon className="w-5 h-5 md:w-6 md:h-6" />
-                      {userNotifications.some(n => !n.read) && <span className="absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />}
+                      {(userNotifications.some(n => !n.read) || pendingUsersCount > 0) && <span className="absolute top-2 right-2 md:top-4 md:right-4 h-2 w-2 md:h-3 md:w-3 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />}
                   </button>
                   {isNotifOpen && <div className="absolute right-0 mt-4 origin-top-right"><NotificationCenter notifications={userNotifications} onMarkAllAsRead={() => setNotifications(n => n.map(x => ({...x, read: true})))} onClose={() => setIsNotifOpen(false)} /></div>}
               </div>

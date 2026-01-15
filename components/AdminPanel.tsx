@@ -180,9 +180,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
                                         n.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
                                         n.type === 'assignment' ? 'bg-primary-50 text-primary-600' :
+                                        n.type === 'warning' ? 'bg-amber-50 text-amber-600' :
                                         'bg-slate-50 text-slate-500'
                                     }`}>
-                                        {n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />}
+                                        {n.type === 'warning' ? <BellIcon className="w-5 h-5" /> : (n.type === 'assignment' ? <MapPinIcon className="w-5 h-5" /> : <BellIcon className="w-5 h-5" />)}
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm text-slate-800 dark:text-slate-200 font-bold group-hover:text-primary-600 transition-colors leading-tight">{n.message}</p>
@@ -468,7 +469,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button 
                             key={item.id} 
                             onClick={() => setActiveTab(item.id)} 
-                            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${
+                            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all relative ${
                                 activeTab === item.id 
                                 ? 'bg-primary-600 text-white shadow-xl shadow-primary-500/30' 
                                 : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
@@ -476,7 +477,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         >
                             <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-white' : 'text-slate-400'}`} />
                             <span className="flex-1 text-left">{item.label}</span>
-                            {item.badge && <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm shadow-rose-500/50" />}
+                            {item.badge && <span className="absolute right-6 top-1/2 -translate-y-1/2 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm shadow-rose-500/50" />}
                         </button>
                     ))}
                 </nav>
@@ -492,9 +493,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-4 shrink-0 overflow-x-auto scrollbar-hide pt-safe sticky top-0 z-[60]">
                 <div className="flex gap-6 py-4 min-w-max">
                     {menuItems.map((item: AdminMenuItem) => (
-                        <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${activeTab === item.id ? 'text-primary-600 border-b-2 border-primary-600 pb-2' : 'text-slate-400'}`}>
+                        <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === item.id ? 'text-primary-600 border-b-2 border-primary-600 pb-2' : 'text-slate-400'}`}>
                             <item.icon className="w-4 h-4" /> {item.label.split(' ')[0]}
-                            {item.badge && <span className="w-2 h-2 bg-rose-500 rounded-full" />}
+                            {item.badge && <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />}
                         </button>
                     ))}
                 </div>
@@ -576,6 +577,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                                                         n.type === 'assignment' ? 'bg-primary-50 text-primary-600' :
                                                         n.type === 'success' ? 'bg-emerald-50 text-emerald-600' :
+                                                        n.type === 'warning' ? 'bg-amber-50 text-amber-600 animate-pulse' :
                                                         'bg-slate-100 text-slate-400'
                                                     }`}>{n.type}</span>
                                                 </td>
@@ -666,7 +668,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {msgModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
+                    <div className="bg-white dark:bg-slate-900 w-full max-sm rounded-[2.5rem] shadow-2xl p-10 animate-slide-up">
                         <div className="flex items-center gap-4 mb-2">
                             <div className="p-3 bg-primary-50 text-primary-600 rounded-xl">
                                 {msgModal.type === 'push' ? <BellIcon className="w-6 h-6" /> : <EnvelopeIcon className="w-6 h-6" />}
