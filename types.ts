@@ -48,6 +48,21 @@ export enum UserRole {
   ADMIN = 'Администратор',
 }
 
+export enum AppPermission {
+  MANAGE_STATIONS = 'Управление станциями',
+  VIEW_STATS = 'Просмотр статистики',
+  MANAGE_USERS = 'Управление пользователями',
+  MANAGE_GROUPS = 'Управление группами',
+  VIEW_LOGS = 'Просмотр логов',
+}
+
+export interface UserGroup {
+  id: string;
+  name: string;
+  description: string;
+  permissions: AppPermission[];
+}
+
 export interface User {
   id: string;
   name: string;
@@ -56,6 +71,7 @@ export interface User {
   password: string;
   status: UserStatus;
   role: UserRole;
+  groupId?: string; // Привязка к группе
 }
 
 export interface AppNotification {
